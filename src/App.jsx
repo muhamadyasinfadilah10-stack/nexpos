@@ -92,7 +92,7 @@ const INITIAL_PRODUCTS = [
         name: 'Extra Topping',
         type: 'multiple',
         options: [
-          { name: 'Extra Boba', extraPrice: 3000 }
+          { name: 'Extra Boba', extraPrice: 3000, ingredientId: 'ing_4', stockQty: 30 }
         ]
       }
     ]
@@ -368,7 +368,14 @@ export default function App() {
     }
 
     const finalPrice = unitPrice + extraCost;
-    const itemHpp = calculateProductHPP(product.recipe);
+    const toppingHpp = Object.values(customs || {}).reduce((total, val) => {
+      const options = Array.isArray(val) ? val : (val && val.name ? [val] : []);
+      return total + options.reduce((sum, opt) => {
+        const ing = opt.ingredientId ? ingredients.find(i => i.id === opt.ingredientId) : null;
+        return sum + ((Number(opt.stockQty) || 0) * (Number(ing?.costPerUnit) || 0));
+      }, 0);
+    }, 0);
+    const itemHpp = calculateProductHPP(product.recipe) + toppingHpp;
     const cartItemId = product.id + '-' + customSummary.sort().join('-') + '-' + orderType;
 
     setCart(prev => {
@@ -379,6 +386,7 @@ export default function App() {
       return [...prev, {
         cartItemId,
         product,
+        customs: JSON.parse(JSON.stringify(customs || {})),
         customsSummary: customSummary.join(', '),
         price: finalPrice,
         hpp: itemHpp,
@@ -421,18 +429,47 @@ export default function App() {
       }
     }
 
-    let updatedIngredients = [...ingredients];
+    // Hitung seluruh bahan yang akan terpakai: resep menu + topping/varian yang terhubung ke stok.
+    const stockUsage = {};
+    const addStockUsage = (ingredientId, qty) => {
+      if (!ingredientId) return;
+      stockUsage[ingredientId] = (stockUsage[ingredientId] || 0) + (Number(qty) || 0);
+    };
+
     cart.forEach(cartItem => {
       const productRecipe = cartItem.product.recipe || [];
       productRecipe.forEach(recipeItem => {
-        const consumedQty = (Number(recipeItem.qty) || 0) * cartItem.qty;
-        updatedIngredients = updatedIngredients.map(ing => {
-          if (ing.id === recipeItem.ingredientId) {
-            return { ...ing, stock: Math.max(0, ing.stock - consumedQty) };
-          }
-          return ing;
+        addStockUsage(recipeItem.ingredientId, (Number(recipeItem.qty) || 0) * cartItem.qty);
+      });
+
+      Object.values(cartItem.customs || {}).forEach(val => {
+        const options = Array.isArray(val) ? val : (val && val.name ? [val] : []);
+        options.forEach(opt => {
+          addStockUsage(opt.ingredientId, (Number(opt.stockQty) || 0) * cartItem.qty);
         });
       });
+    });
+
+    const insufficientStock = Object.entries(stockUsage)
+      .map(([ingredientId, usedQty]) => {
+        const ing = ingredients.find(i => i.id === ingredientId);
+        return ing && usedQty > Number(ing.stock)
+          ? { ...ing, usedQty }
+          : null;
+      })
+      .filter(Boolean);
+
+    if (insufficientStock.length > 0) {
+      const detail = insufficientStock
+        .map(ing => `${ing.name}: stok ${ing.stock} ${ing.unit}, dibutuhkan ${ing.usedQty} ${ing.unit}`)
+        .join('\n');
+      alert(`Stok tidak mencukupi untuk menyelesaikan transaksi:\n\n${detail}`);
+      return;
+    }
+
+    let updatedIngredients = ingredients.map(ing => {
+      const usedQty = stockUsage[ing.id] || 0;
+      return usedQty > 0 ? { ...ing, stock: Math.max(0, Number(ing.stock) - usedQty) } : ing;
     });
     setIngredients(updatedIngredients);
 
@@ -2048,35 +2085,70 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
                       </button>
                     </div>
 
-                    <div className="flex gap-1.5 items-center bg-slate-50 p-2 rounded-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-1.5 items-center bg-slate-50 p-2 rounded-lg">
                       <input
                         type="text"
                         id={`opt_name_${group.id}`}
                         placeholder="Nama Opsi (Misal: Extra Boba)"
-                        className="flex-1 p-1 border rounded text-xs bg-white"
+                        className="sm:col-span-2 flex-1 p-1 border rounded text-xs bg-white"
                       />
                       <input
                         type="number"
                         id={`opt_price_${group.id}`}
                         placeholder="+Biaya (Rp)"
-                        className="w-24 p-1 border rounded text-xs bg-white"
+                        className="w-full p-1 border rounded text-xs bg-white"
                       />
+                      <input
+                        type="number"
+                        id={`opt_stock_qty_${group.id}`}
+                        placeholder="Pakai stok"
+                        min="0"
+                        step="any"
+                        className="w-full p-1 border rounded text-xs bg-white"
+                      />
+                      <select
+                        id={`opt_ingredient_${group.id}`}
+                        defaultValue=""
+                        className="sm:col-span-3 p-1 border rounded text-xs bg-white"
+                      >
+                        <option value="">Tanpa potong stok (opsional)</option>
+                        {ingredients.map(ing => (
+                          <option key={ing.id} value={ing.id}>
+                            Stok: {ing.name} ({ing.unit})
+                          </option>
+                        ))}
+                      </select>
                       <button
                         type="button"
                         onClick={() => {
                           const nameInput = document.getElementById(`opt_name_${group.id}`);
                           const priceInput = document.getElementById(`opt_price_${group.id}`);
+                          const stockQtyInput = document.getElementById(`opt_stock_qty_${group.id}`);
+                          const ingredientInput = document.getElementById(`opt_ingredient_${group.id}`);
                           if (!nameInput.value.trim()) {
                             alert('Masukkan nama opsi varian!');
                             return;
                           }
+                          const stockQty = Number(stockQtyInput.value) || 0;
+                          if (stockQty > 0 && !ingredientInput.value) {
+                            alert('Pilih bahan stok yang akan dipotong untuk topping ini.');
+                            return;
+                          }
+                          if (ingredientInput.value && stockQty <= 0) {
+                            alert('Isi jumlah pemakaian stok topping lebih dari 0.');
+                            return;
+                          }
                           const newOpt = {
                             name: nameInput.value.trim(),
-                            extraPrice: Number(priceInput.value) || 0
+                            extraPrice: Number(priceInput.value) || 0,
+                            ingredientId: ingredientInput.value || null,
+                            stockQty
                           };
                           setFormCustomGroups(formCustomGroups.map(g => g.id === group.id ? { ...g, options: [...g.options, newOpt] } : g));
                           nameInput.value = '';
                           priceInput.value = '';
+                          stockQtyInput.value = '';
+                          ingredientInput.value = '';
                         }}
                         className="bg-slate-900 text-white font-bold px-2.5 py-1 rounded text-xs"
                       >
@@ -2086,17 +2158,55 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
 
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {group.options.map((opt, optIdx) => (
-                        <span key={optIdx} className="bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] flex items-center">
-                          <span className="font-medium text-slate-800">{opt.name}</span>
-                          {opt.extraPrice > 0 && <span className="text-amber-700 font-bold ml-1">(+Rp{opt.extraPrice.toLocaleString('id-ID')})</span>}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveOptionFromGroup(group.id, optIdx)}
-                            className="text-rose-500 font-bold ml-2 hover:text-rose-700"
-                          >
-                            ×
-                          </button>
-                        </span>
+                        <div key={optIdx} className="w-full bg-amber-50 border border-amber-200 p-2 rounded-lg text-[11px]">
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <span className="font-medium text-slate-800">{opt.name}</span>
+                              {opt.extraPrice > 0 && <span className="text-amber-700 font-bold ml-1">(+Rp{opt.extraPrice.toLocaleString('id-ID')})</span>}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveOptionFromGroup(group.id, optIdx)}
+                              className="text-rose-500 font-bold hover:text-rose-700 px-1"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 mt-1.5">
+                            <select
+                              value={opt.ingredientId || ''}
+                              onChange={(e) => {
+                                const updated = [...formCustomGroups];
+                                const target = updated.find(g => g.id === group.id);
+                                if (target) target.options[optIdx] = { ...target.options[optIdx], ingredientId: e.target.value || null };
+                                setFormCustomGroups(updated);
+                              }}
+                              className="sm:col-span-2 p-1 border rounded bg-white text-[10px]"
+                            >
+                              <option value="">Tidak terhubung ke stok</option>
+                              {ingredients.map(ing => (
+                                <option key={ing.id} value={ing.id}>
+                                  Stok: {ing.name} ({ing.unit})
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={opt.stockQty || ''}
+                              onChange={(e) => {
+                                const updated = [...formCustomGroups];
+                                const target = updated.find(g => g.id === group.id);
+                                if (target) target.options[optIdx] = { ...target.options[optIdx], stockQty: Number(e.target.value) || 0 };
+                                setFormCustomGroups(updated);
+                              }}
+                              placeholder="Qty stok"
+                              className="p-1 border rounded bg-white text-[10px]"
+                            />
+                          </div>
+                          <p className="text-[9px] text-slate-500 mt-1">{opt.ingredientId && opt.stockQty ? 'Stok akan berkurang saat topping dipilih dan transaksi dibayar.' : 'Belum terhubung ke stok.'}</p>
+                        </div>
                       ))}
                     </div>
                   </div>
