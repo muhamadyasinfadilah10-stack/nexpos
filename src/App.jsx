@@ -926,17 +926,17 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
 
   return (
     
-    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans pb-16 md:pb-0">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-100 text-slate-800 flex flex-col font-sans pb-16 md:pb-0">
       
       {/* NAVBAR TOP */}
-      <header className="bg-slate-900 text-white px-3 sm:px-4 py-2.5 shadow-md flex items-center justify-between sticky top-0 z-30">
+      <header className="bg-slate-900 text-white px-2.5 sm:px-4 py-2.5 shadow-md flex items-center justify-between sticky top-0 z-30 min-w-0">
         <div className="flex items-center space-x-2 sm:space-x-3">
           <div className="bg-amber-500 p-1.5 sm:p-2 rounded-lg text-slate-900 font-extrabold flex items-center text-xs sm:text-sm">
             <Coffee className="w-4 h-4 sm:w-5 sm:h-5 mr-1"/>
             <span>NEXPOS</span>
           </div>
 
-          <div className="relative flex items-center bg-slate-800 rounded-lg border border-slate-700 px-2 py-1">
+          <div className="relative flex items-center bg-slate-800 rounded-lg border border-slate-700 px-1.5 sm:px-2 py-1 min-w-0 max-w-[45vw] sm:max-w-none">
             <Store className="w-3.5 h-3.5 text-amber-400 mr-1"/>
             <select
               value={activeOutletId}
@@ -944,7 +944,7 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
                 setActiveOutletId(e.target.value);
                 setCart([]);
               }}
-              className="bg-transparent text-[11px] sm:text-xs font-bold text-slate-200 outline-none cursor-pointer pr-1"
+              className="bg-transparent text-[10px] sm:text-xs font-bold text-slate-200 outline-none cursor-pointer pr-1 max-w-[30vw] sm:max-w-none"
             >
               {outlets.map(o => (
                 <option key={o.id} value={o.id} className="bg-slate-900 text-white">
@@ -1010,12 +1010,12 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
       </header>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
 
         {/* TAB 1: KASIR / POS */}
         {currentTab === 'pos' && (
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-            <div className="flex-1 flex flex-col overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 pb-20 md:pb-4">
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col md:flex-row overflow-hidden relative">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 pb-20 md:pb-4">
               <div className="flex flex-col sm:flex-row justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 shadow-sm">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400"/>
@@ -1692,43 +1692,45 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
 
       </main>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-slate-400 flex justify-around items-center py-2 z-30 px-1">
-        <button onClick={() => setCurrentTab('pos')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'pos' ? 'text-amber-400' : ''}`}>
+      {/* MOBILE BOTTOM NAVIGATION BAR - MENU LENGKAP SEPERTI LAPTOP */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-slate-400 z-30">
+        <div className="flex items-center gap-1 overflow-x-auto px-1.5 py-1.5 scrollbar-none">
+        <button onClick={() => setCurrentTab('pos')} className={`flex-none min-w-[62px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'pos' ? 'text-amber-400 bg-slate-800' : ''}`}>
           <ShoppingBag className="w-5 h-5"/>
           <span>Kasir</span>
         </button>
-        <button onClick={() => setCurrentTab('shift')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'shift' ? 'text-amber-400' : ''}`}>
+        <button onClick={() => setCurrentTab('shift')} className={`flex-none min-w-[62px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'shift' ? 'text-amber-400 bg-slate-800' : ''}`}>
           <Clock className="w-5 h-5"/>
           <span>Shift</span>
         </button>
-        <button onClick={() => setCurrentTab('stock')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'stock' ? 'text-amber-400' : ''}`}>
+        <button onClick={() => setCurrentTab('stock')} className={`flex-none min-w-[62px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'stock' ? 'text-amber-400 bg-slate-800' : ''}`}>
           <PackageCheck className="w-5 h-5"/>
           <span>Stok</span>
         </button>
-        <button onClick={() => setCurrentTab('expenses')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'expenses' ? 'text-amber-400' : ''}`}>
+        <button onClick={() => setCurrentTab('expenses')} className={`flex-none min-w-[78px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'expenses' ? 'text-amber-400 bg-slate-800' : ''}`}>
           <Receipt className="w-5 h-5"/>
           <span>Pengeluaran</span>
         </button>
         {activeRole === 'owner' && (
           <>
-            <button onClick={() => setCurrentTab('products')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'products' ? 'text-amber-400' : ''}`}>
+            <button onClick={() => setCurrentTab('products')} className={`flex-none min-w-[78px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'products' ? 'text-amber-400 bg-slate-800' : ''}`}>
               <Layers className="w-5 h-5"/>
               <span>Menu</span>
             </button>
-            <button onClick={() => setCurrentTab('reports')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'reports' ? 'text-amber-400' : ''}`}>
+            <button onClick={() => setCurrentTab('reports')} className={`flex-none min-w-[70px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'reports' ? 'text-amber-400 bg-slate-800' : ''}`}>
               <TrendingUp className="w-5 h-5"/>
               <span>Laporan</span>
             </button>
           </>
         )}
-        <button onClick={() => setCurrentTab('history')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'history' ? 'text-amber-400' : ''}`}>
+        <button onClick={() => setCurrentTab('history')} className={`flex-none min-w-[70px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'history' ? 'text-amber-400 bg-slate-800' : ''}`}>
           <Receipt className="w-5 h-5"/>
           <span>Riwayat</span>
         </button>
+        </div>
       </div>
 
-      {/* --- MODAL BUAT OUTLET BARU --- */}
+      {/* --- MODAL BUAT OUTLET BARU ---}
       {isOutletModalOpen && activeRole === 'owner' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 text-xs">
