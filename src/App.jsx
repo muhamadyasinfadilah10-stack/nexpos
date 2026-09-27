@@ -118,6 +118,18 @@ export default function App() {
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pinPurpose, setPinPurpose] = useState(null);
 
+  const [outletSettingsMap, setOutletSettingsMap] = useState(() => {
+    const saved = localStorage.getItem('nexpos_outlet_settings_map');
+    return saved ? JSON.parse(saved) : {
+      out_1: {
+        storeName: 'NEXPOS STORE',
+        address: 'Jl. Contoh No. 123, Tasikmalaya',
+        phone: '081234567890',
+        footerMessage: 'Terima kasih atas kunjungan Anda!'
+      }
+    };
+  });
+
   const [currentTab, setCurrentTab] = useState('pos');
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
@@ -2259,14 +2271,3 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
     </div>
   );
 }
-const [outletSettingsMap, setOutletSettingsMap] = useState(() => {
-  const saved = localStorage.getItem('nexpos_outlet_settings_map');
-  return saved ? JSON.parse(saved) : {
-    out_1: {
-      storeName: 'NEXPOS STORE',
-      address: 'Jl. Contoh No. 123, Tasikmalaya',
-      phone: '081234567890',
-      footerMessage: 'Terima kasih atas kunjungan Anda!'
-    }
-  };
-});
