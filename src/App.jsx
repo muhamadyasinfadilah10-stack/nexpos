@@ -24,7 +24,8 @@ import {
   ShoppingCart,
   ChevronRight,
   Settings,
-  Calculator
+  Calculator,
+  Printer
 } from 'lucide-react';
 
 // --- HELPER FORMAT TANGGAL & WAKTU ---
@@ -661,6 +662,119 @@ export default function App() {
     }
   };
 
+  // --- CETAK STRUK TRANSAKSI ---
+  const handlePrintReceipt = (receipt) => {
+    if (!receipt) return;
+
+    const itemsHtml = receipt.items.map(item => `
+      <tr>
+        <td style="padding:4px 0;vertical-align:top;">
+          ${item.qty}x ${item.product.name}
+          ${item.customsSummary ? `<div style="font-size:10px;color:#555;">${item.customsSummary}</div>` : ''}
+        </td>
+        <td style="padding:4px 0;text-align:right;vertical-align:top;white-space:nowrap;">
+          Rp ${(item.price * item.qty).toLocaleString('id-ID')}
+        </td>
+      </tr>
+    `).join('');
+
+    const paymentLabel = {
+      cash: 'TUNAI',
+      qris: 'QRIS',
+      debit: 'DEBIT'
+    }[receipt.paymentMethod] || String(receipt.paymentMethod || '').toUpperCase();
+
+    const printWindow = window.open('', '_blank', 'width=420,height=700');
+
+    if (!printWindow) {
+      alert('Popup diblokir browser. Izinkan popup untuk mencetak struk.');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="id">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Struk ${receipt.queueNum} - ${receipt.outletName}</title>
+        <style>
+          @page { size: 80mm auto; margin: 4mm; }
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            padding: 0;
+            width: 72mm;
+            font-family: "Courier New", monospace;
+            font-size: 12px;
+            color: #000;
+            background: #fff;
+          }
+          .receipt { width: 100%; }
+          .center { text-align: center; }
+          .bold { font-weight: 700; }
+          .muted { color: #555; font-size: 10px; }
+          .line { border-top: 1px dashed #000; margin: 8px 0; }
+          table { width: 100%; border-collapse: collapse; }
+          .info td { padding: 2px 0; }
+          .total td { font-weight: 700; font-size: 14px; padding-top: 6px; }
+          .footer { text-align: center; margin-top: 12px; font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <div class="center bold" style="font-size:16px;">NEXPOS</div>
+          <div class="center bold">${receipt.outletName}</div>
+          <div class="center muted">${getDisplayDate(receipt.dateStr)} ${receipt.timeStr}</div>
+
+          <div class="line"></div>
+
+          <table class="info">
+            <tr><td>Antrean</td><td style="text-align:right;" class="bold">${receipt.queueNum}</td></tr>
+            <tr><td>Pelanggan</td><td style="text-align:right;">${receipt.customerName}</td></tr>
+            <tr><td>Meja</td><td style="text-align:right;">${receipt.tableNumber || '-'}</td></tr>
+            <tr><td>Pesanan</td><td style="text-align:right;">${receipt.orderType === 'dineIn' ? 'Dine-In' : receipt.orderType === 'takeaway' ? 'Takeaway' : 'Online'}</td></tr>
+          </table>
+
+          <div class="line"></div>
+          <table>${itemsHtml}</table>
+          <div class="line"></div>
+
+          <table>
+            <tr><td>Subtotal</td><td style="text-align:right;">Rp ${receipt.subtotal.toLocaleString('id-ID')}</td></tr>
+            ${receipt.discountAmount > 0 ? `<tr><td>Diskon</td><td style="text-align:right;">- Rp ${receipt.discountAmount.toLocaleString('id-ID')}</td></tr>` : ''}
+            <tr class="total"><td>TOTAL</td><td style="text-align:right;">Rp ${receipt.grandTotal.toLocaleString('id-ID')}</td></tr>
+          </table>
+
+          <div class="line"></div>
+
+          <table class="info">
+            <tr><td>Pembayaran</td><td style="text-align:right;">${paymentLabel}</td></tr>
+            ${receipt.paymentMethod === 'cash' ? `
+              <tr><td>Dibayar</td><td style="text-align:right;">Rp ${(receipt.cashGiven || 0).toLocaleString('id-ID')}</td></tr>
+              <tr><td>Kembalian</td><td style="text-align:right;">Rp ${(receipt.change || 0).toLocaleString('id-ID')}</td></tr>
+            ` : ''}
+          </table>
+
+          <div class="footer">
+            Terima kasih telah berbelanja<br />
+            NEXPOS F&B
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.focus();
+            window.print();
+            window.onafterprint = function() { window.close(); };
+          };
+        </script>
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+  };
+
   const generateWhatsAppReport = () => {
     const targetDate = reportFilterType === 'daily' ? reportDate : getFormattedDate();
     const outletTx = transactions.filter(t => t.dateStr === targetDate && t.status === 'completed');
@@ -811,6 +925,7 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
   );
 
   return (
+    
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans pb-16 md:pb-0">
       
       {/* NAVBAR TOP */}
@@ -1262,195 +1377,239 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4 overflow-y-auto">
             <div className="grid md:grid-cols-3 gap-4">
               <div className="bg-white p-4 sm:p-5 rounded-2xl border space-y-3 text-xs h-fit">
-                <h3 className="font-bold text-sm text-slate-800">Catat Pengeluaran Baru</h3>
+                <h3 className="font-bold text-sm text-slate-800 flex items-center">
+                  <Receipt className="w-4 h-4 mr-1 text-amber-600"/> Catat Pengeluaran ({currentOutletObj.name})
+                </h3>
                 <form onSubmit={handleAddExpense} className="space-y-3">
                   <div>
-                    <label className="block mb-1 font-medium">Judul Pengeluaran</label>
-                    <input required name="title" className="w-full p-2 border rounded-xl" placeholder="Contoh: Beli Gas 3kg" />
+                    <label className="block mb-1 font-semibold text-slate-700">Deskripsi Pengeluaran</label>
+                    <input required name="title" className="w-full p-2.5 border rounded-xl" placeholder="Misal: Beli Es Batu, Gas" />
                   </div>
                   <div>
-                    <label className="block mb-1 font-medium">Nominal (Rp)</label>
-                    <input required type="number" name="amount" className="w-full p-2 border rounded-xl" placeholder="25000" />
+                    <label className="block mb-1 font-semibold text-slate-700">Nominal (Rp)</label>
+                    <input required type="number" name="amount" className="w-full p-2.5 border rounded-xl" placeholder="15000" />
                   </div>
                   <div>
-                    <label className="block mb-1 font-medium">Kategori</label>
-                    <select name="category" className="w-full p-2 border rounded-xl bg-white">
-                      <option value="Bahan Baku / Belanja">Bahan Baku / Belanja</option>
-                      <option value="Operasional (Listrik/Air/Wifi)">Operasional (Listrik/Air/Wifi)</option>
-                      <option value="Gaji Karyawan">Gaji Karyawan</option>
-                      <option value="Lain-lain">Lain-lain</option>
+                    <label className="block mb-1 font-semibold text-slate-700">Kategori</label>
+                    <select name="category" className="w-full p-2.5 border rounded-xl">
+                      <option value="Bahan Baku Mendadak">Bahan Baku Mendadak</option>
+                      <option value="Operasional Harian">Operasional Harian</option>
+                      <option value="Gas / Listrik">Gas / Listrik</option>
                     </select>
                   </div>
-                  <button type="submit" className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl">
+                  <button type="submit" className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl active:scale-98 transition">
                     Simpan Pengeluaran
                   </button>
                 </form>
               </div>
 
-              <div className="md:col-span-2 bg-white p-4 sm:p-5 rounded-2xl border space-y-3 text-xs">
-                <h3 className="font-bold text-sm text-slate-800">Daftar Pengeluaran ({currentOutletObj.name})</h3>
-                <div className="divide-y max-h-96 overflow-y-auto">
-                  {expenses.length === 0 ? (
-                    <p className="text-slate-400 py-6 text-center">Belum ada catatan pengeluaran operasional.</p>
-                  ) : (
-                    expenses.map(exp => (
-                      <div key={exp.id} className="py-3 flex justify-between items-center">
-                        <div>
-                          <p className="font-bold text-slate-800 text-sm">{exp.title}</p>
-                          <span className="text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{exp.category}</span>
-                          <span className="text-[10px] text-slate-400 block mt-1">📅 {getDisplayDate(exp.dateStr)} | Kasir: {exp.cashierName}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-extrabold text-rose-600 text-sm">- Rp {exp.amount.toLocaleString('id-ID')}</span>
-                          <button onClick={() => setExpenses(expenses.filter(e => e.id !== exp.id))} className="block text-[10px] text-rose-500 hover:underline mt-1 ml-auto">Hapus</button>
-                        </div>
-                      </div>
-                    ))
-                  )}
+              <div className="md:col-span-2 bg-white rounded-2xl border overflow-x-auto">
+                <div className="p-3 bg-slate-50 border-b font-bold text-xs">
+                  Riwayat Pengeluaran ({currentOutletObj.name})
                 </div>
+                <table className="w-full text-left text-xs min-w-[450px]">
+                  <thead className="bg-slate-50 border-b">
+                    <tr>
+                      <th className="p-3">Tanggal</th>
+                      <th className="p-3">Deskripsi</th>
+                      <th className="p-3">Kategori</th>
+                      <th className="p-3 text-right">Nominal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {expenses.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="p-6 text-center text-slate-400 italic">Belum ada data pengeluaran.</td>
+                      </tr>
+                    ) : (
+                      expenses.map(exp => (
+                        <tr key={exp.id}>
+                          <td className="p-3 text-slate-500">{getDisplayDate(exp.dateStr)} {exp.timeStr}</td>
+                          <td className="p-3 font-bold text-slate-800">{exp.title}</td>
+                          <td className="p-3"><span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px]">{exp.category}</span></td>
+                          <td className="p-3 text-right font-bold text-rose-600">Rp {exp.amount.toLocaleString('id-ID')}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB 5: MENU & HPP (Hanya Owner) */}
+        {/* TAB 5: KELOLA MENU & RESEP HPP (OWNER ONLY) */}
         {currentTab === 'products' && activeRole === 'owner' && (
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4 overflow-y-auto">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-sm sm:text-base text-slate-800">Kelola Menu & Resep HPP ({currentOutletObj.name})</h3>
-                <p className="text-[11px] sm:text-xs text-slate-500">Buat produk dan tautkan dengan bahan baku stok untuk perhitungan HPP otomatis.</p>
+                <h3 className="font-bold text-sm sm:text-base">Daftar Menu & Resep HPP ({currentOutletObj.name})</h3>
+                <p className="text-xs text-slate-500">Tentukan resep bahan baku untuk otomatisasi hitung HPP dan pemotongan stok.</p>
               </div>
-              <button onClick={() => handleOpenProductModal()} className="bg-amber-500 font-bold px-3 py-2 rounded-xl text-xs flex items-center shadow-sm">
-                <Plus className="w-4 h-4 mr-1"/> Tambah Menu Baru
+              <button onClick={() => handleOpenProductModal()} className="bg-amber-500 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center">
+                <Plus className="w-4 h-4 mr-1"/> Tambah Menu
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {products.map(prod => {
-                const hpp = calculateProductHPP(prod.recipe);
-                const dineInPrice = prod.prices?.dineIn || 0;
-                const profit = dineInPrice - hpp;
+            <div className="bg-white rounded-2xl shadow-sm border overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[650px]">
+                <thead className="bg-slate-50 border-b">
+                  <tr>
+                    <th className="p-3">Menu</th>
+                    <th className="p-3">Kategori</th>
+                    <th className="p-3">Harga Jual</th>
+                    <th className="p-3">HPP (Modal)</th>
+                    <th className="p-3">Estimasi Untung</th>
+                    <th className="p-3">Varian & Topping</th>
+                    <th className="p-3">Resep Bahan Baku</th>
+                    <th className="p-3 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {products.length === 0 ? (
+                    <tr>
+                      <td colSpan={activeRole === 'owner' ? 9 : 8} className="p-8 text-center text-slate-400 italic">
+                        Belum ada menu di outlet ini. Klik tombol "+ Tambah Menu".
+                      </td>
+                    </tr>
+                  ) : (
+                    products.map(p => {
+                      const price = p.prices.dineIn;
+                      const hpp = calculateProductHPP(p.recipe);
+                      const profit = price - hpp;
 
-                return (
-                  <div key={prod.id} className="bg-white rounded-2xl border p-4 space-y-3 flex flex-col justify-between shadow-sm">
-                    <div className="flex space-x-3">
-                      <img src={prod.image} alt={prod.name} className="w-16 h-16 rounded-xl object-cover border" />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold">{prod.category}</span>
-                        <h4 className="font-bold text-slate-800 text-xs sm:text-sm truncate mt-0.5">{prod.name}</h4>
-                        <p className="text-amber-600 font-extrabold text-xs">Rp {dineInPrice.toLocaleString('id-ID')}</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-50 p-2.5 rounded-xl border text-[11px] space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">HPP Bahan:</span>
-                        <span className="font-bold text-slate-700">Rp {hpp}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Estimasi Untung:</span>
-                        <span className="font-bold text-emerald-600">Rp {profit}</span>
-                      </div>
-                      <div className="pt-1 border-t text-[10px] text-slate-400">
-                        Resep: {prod.recipe?.length || 0} bahan | Varian: {prod.customGroups?.length || 0} grup
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-2 pt-1">
-                      <button onClick={() => handleOpenProductModal(prod)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 rounded-lg text-xs flex items-center justify-center">
-                        <Edit className="w-3.5 h-3.5 mr-1"/> Edit Menu
-                      </button>
-                      <button onClick={() => setProducts(products.filter(p => p.id !== prod.id))} className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-1.5 rounded-lg">
-                        <Trash2 className="w-4 h-4"/>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                      return (
+                        <tr key={p.id}>
+                          <td className="p-3 font-bold">{p.name}</td>
+                          <td className="p-3">{p.category}</td>
+                          <td className="p-3 font-semibold text-slate-800">Rp {price.toLocaleString('id-ID')}</td>
+                          <td className="p-3 font-bold text-rose-600">Rp {hpp.toLocaleString('id-ID')}</td>
+                          <td className="p-3 font-bold text-emerald-600">Rp {profit.toLocaleString('id-ID')}</td>
+                          <td className="p-3">
+                            {p.customGroups && p.customGroups.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {p.customGroups.map(g => (
+                                  <span key={g.id} className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+                                    {g.name} ({g.options.length})
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic text-[10px]">Tanpa varian</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {p.recipe && p.recipe.length > 0 ? (
+                              <div className="space-y-0.5">
+                                {p.recipe.map((rec, rIdx) => {
+                                  const ingObj = ingredients.find(i => i.id === rec.ingredientId);
+                                  return (
+                                    <div key={rIdx} className="text-[10px] bg-slate-100 px-2 py-0.5 rounded w-fit">
+                                      {ingObj ? ingObj.name : 'Bahan'}: {rec.qty} {ingObj ? ingObj.unit : ''}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic text-[10px]">Belum diatur</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right space-x-1">
+                            <button onClick={() => handleOpenProductModal(p)} className="p-1 bg-slate-100 rounded">
+                              <Edit className="w-3.5 h-3.5"/>
+                            </button>
+                            <button onClick={() => setProducts(products.filter(x => x.id !== p.id))} className="p-1 bg-rose-50 text-rose-600 rounded">
+                              <Trash2 className="w-3.5 h-3.5"/>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
-        {/* TAB 6: LAPORAN (Hanya Owner) */}
+        {/* TAB 6: LAPORAN KEUANGAN & HPP (OWNER ONLY) */}
         {currentTab === 'reports' && activeRole === 'owner' && (
-          <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4 overflow-y-auto">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-white p-4 rounded-2xl border shadow-sm">
+          <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4 sm:space-y-6 text-xs overflow-y-auto">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
-                <h3 className="font-bold text-sm sm:text-base text-slate-800">Laporan Keuangan & HPP ({currentOutletObj.name})</h3>
-                <p className="text-[11px] sm:text-xs text-slate-500">Analisis omset, modal HPP, pengeluaran operasional, dan laba bersih.</p>
+                <h3 className="font-bold text-sm sm:text-base text-slate-800">Laporan Laba/Rugi & HPP ({currentOutletObj.name})</h3>
+                <p className="text-[11px] sm:text-xs text-slate-500">Omset dikurangi HPP (Modal Bahan) dan Pengeluaran Operasional.</p>
               </div>
-              <div className="flex items-center space-x-2">
-                <select value={reportFilterType} onChange={(e) => setReportFilterType(e.target.value)} className="p-2 border rounded-xl text-xs bg-white font-bold">
+
+              <div className="flex items-center space-x-2 bg-white p-2 rounded-xl border w-full sm:w-auto">
+                <select
+                  value={reportFilterType}
+                  onChange={(e) => setReportFilterType(e.target.value)}
+                  className="p-1 border rounded font-semibold text-slate-700 text-xs"
+                >
                   <option value="daily">Harian</option>
+                  <option value="monthly">Bulanan</option>
                 </select>
-                {reportFilterType === 'daily' && (
-                  <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className="p-2 border rounded-xl text-xs bg-white font-bold" />
+
+                {reportFilterType === 'daily' ? (
+                  <input
+                    type="date"
+                    value={reportDate}
+                    onChange={(e) => setReportDate(e.target.value)}
+                    className="p-1 border rounded font-bold text-slate-800 text-xs"
+                  />
+                ) : (
+                  <input
+                    type="month"
+                    value={reportMonth}
+                    onChange={(e) => setReportMonth(e.target.value)}
+                    className="p-1 border rounded font-bold text-slate-800 text-xs"
+                  />
                 )}
+
+                <button
+                  onClick={() => setIsEmailModalOpen(true)}
+                  className="bg-slate-900 text-white px-2.5 py-1 rounded font-bold flex items-center text-xs ml-auto"
+                >
+                  <Mail className="w-3.5 h-3.5 mr-1"/> Email
+                </button>
               </div>
             </div>
 
             {(() => {
-              const outletTx = transactions.filter(t => t.dateStr === reportDate && t.status === 'completed');
-              const outletExp = expenses.filter(e => e.dateStr === reportDate);
+              const txList = transactions.filter(t => {
+                if (t.status !== 'completed') return false;
+                return reportFilterType === 'daily' ? t.dateStr === reportDate : t.monthStr === reportMonth;
+              });
 
-              const totalOmset = outletTx.reduce((acc, t) => acc + t.grandTotal, 0);
-              const totalHpp = outletTx.reduce((acc, t) => acc + (t.totalHpp || 0), 0);
-              const totalExp = outletExp.reduce((acc, e) => acc + e.amount, 0);
-              const grossProfit = totalOmset - totalHpp;
+              const expList = expenses.filter(e => {
+                return reportFilterType === 'daily' ? e.dateStr === reportDate : e.monthStr === reportMonth;
+              });
+
+              const omset = txList.reduce((a, b) => a + b.grandTotal, 0);
+              const totalHpp = txList.reduce((a, b) => a + (b.totalHpp || 0), 0);
+              const grossProfit = omset - totalHpp;
+              const totalExp = expList.reduce((a, b) => a + b.amount, 0);
               const netProfit = grossProfit - totalExp;
 
               return (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div className="bg-white p-4 rounded-2xl border shadow-sm space-y-1">
-                      <span className="text-[11px] text-slate-400 font-medium">Total Omset Penjualan</span>
-                      <h4 className="font-extrabold text-slate-800 text-base sm:text-lg">Rp {totalOmset.toLocaleString('id-ID')}</h4>
-                      <span className="text-[10px] text-slate-500 block">{outletTx.length} transaksi selesai</span>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                    <div className="bg-white p-4 rounded-xl border">
+                      <p className="text-slate-500">Total Omset Penjualan</p>
+                      <p className="text-base sm:text-lg font-extrabold text-slate-800 mt-1">Rp {omset.toLocaleString('id-ID')}</p>
                     </div>
-                    <div className="bg-white p-4 rounded-2xl border shadow-sm space-y-1">
-                      <span className="text-[11px] text-slate-400 font-medium">Total HPP (Modal Bahan)</span>
-                      <h4 className="font-extrabold text-rose-600 text-base sm:text-lg">Rp {totalHpp.toLocaleString('id-ID')}</h4>
-                      <span className="text-[10px] text-slate-500 block">Pengurangan stok resep</span>
+                    <div className="bg-white p-4 rounded-xl border">
+                      <p className="text-slate-500">Total HPP (Modal Bahan)</p>
+                      <p className="text-base sm:text-lg font-extrabold text-rose-600 mt-1">Rp {totalHpp.toLocaleString('id-ID')}</p>
                     </div>
-                    <div className="bg-white p-4 rounded-2xl border shadow-sm space-y-1">
-                      <span className="text-[11px] text-slate-400 font-medium">Total Pengeluaran Ops</span>
-                      <h4 className="font-extrabold text-amber-600 text-base sm:text-lg">Rp {totalExp.toLocaleString('id-ID')}</h4>
-                      <span className="text-[10px] text-slate-500 block">{outletExp.length} catatan pengeluaran</span>
+                    <div className="bg-white p-4 rounded-xl border">
+                      <p className="text-slate-500">Total Pengeluaran Ops.</p>
+                      <p className="text-base sm:text-lg font-extrabold text-amber-600 mt-1">Rp {totalExp.toLocaleString('id-ID')}</p>
                     </div>
-                    <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-md space-y-1">
-                      <span className="text-[11px] text-amber-400 font-medium">KEUNTUNGAN BERSIH (NET)</span>
-                      <h4 className="font-extrabold text-white text-base sm:text-lg">Rp {netProfit.toLocaleString('id-ID')}</h4>
-                      <span className="text-[10px] text-slate-300 block">Laba Kotor - Pengeluaran</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-2xl border p-4 space-y-3">
-                    <h4 className="font-bold text-slate-800 text-xs sm:text-sm">Riwayat Transaksi Harian ({getDisplayDate(reportDate)})</h4>
-                    <div className="divide-y max-h-96 overflow-y-auto text-xs">
-                      {outletTx.length === 0 ? (
-                        <p className="text-slate-400 py-6 text-center">Tidak ada transaksi pada tanggal ini.</p>
-                      ) : (
-                        outletTx.map(tx => (
-                          <div key={tx.id} className="py-3 flex justify-between items-center">
-                            <div>
-                              <div className="flex items-center space-x-2">
-                                <span className="bg-slate-900 text-white font-bold px-2 py-0.5 rounded text-[10px]">{tx.queueNum}</span>
-                                <span className="font-bold text-slate-800">{tx.customerName}</span>
-                                <span className="text-[10px] text-slate-500 uppercase bg-slate-100 px-1.5 py-0.5 rounded font-bold">{tx.paymentMethod}</span>
-                              </div>
-                              <p className="text-[11px] text-slate-500 mt-1">
-                                {tx.items.map(i => `${i.qty}x ${i.product.name}`).join(', ')}
-                              </p>
-                              <span className="text-[10px] text-slate-400 block mt-0.5">Jam: {tx.timeStr} | Kasir: {tx.cashierName} | HPP: Rp {tx.totalHpp}</span>
-                            </div>
-                            <div className="text-right">
-                              <span className="font-extrabold text-amber-600 text-sm">Rp {tx.grandTotal.toLocaleString('id-ID')}</span>
-                              <button onClick={() => handleDeleteTransaction(tx.id)} className="block text-[10px] text-rose-500 hover:underline mt-1 ml-auto">Hapus</button>
-                            </div>
-                          </div>
-                        ))
-                      )}
+                    <div className="bg-slate-900 text-white p-4 rounded-xl shadow">
+                      <p className="text-amber-400 font-medium">KEUNTUNGAN BERSIH</p>
+                      <p className="text-lg sm:text-xl font-extrabold mt-1">Rp {netProfit.toLocaleString('id-ID')}</p>
                     </div>
                   </div>
                 </div>
@@ -1462,490 +1621,635 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         {/* TAB 7: RIWAYAT TRANSAKSI */}
         {currentTab === 'history' && (
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4 overflow-y-auto">
-            <div className="bg-white p-4 rounded-2xl border shadow-sm flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-sm sm:text-base text-slate-800">Riwayat Pesanan & Transaksi ({currentOutletObj.name})</h3>
-                <p className="text-[11px] sm:text-xs text-slate-500">Daftar seluruh transaksi yang pernah diproses pada outlet ini.</p>
-              </div>
-              <span className="bg-amber-100 text-amber-800 font-bold px-3 py-1 rounded-full text-xs">
-                {transactions.length} Total Tx
-              </span>
-            </div>
-
-            <div className="bg-white rounded-2xl border p-4 space-y-3">
-              <div className="divide-y max-h-[60vh] overflow-y-auto text-xs">
-                {transactions.length === 0 ? (
-                  <p className="text-slate-400 py-10 text-center">Belum ada riwayat transaksi.</p>
-                ) : (
-                  transactions.map(tx => (
-                    <div key={tx.id} className="py-3 flex justify-between items-center">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="bg-slate-900 text-white font-bold px-2 py-0.5 rounded text-[10px]">{tx.queueNum}</span>
-                          <span className="font-bold text-slate-800">{tx.customerName}</span>
-                          <span className="text-[10px] uppercase font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{tx.paymentMethod}</span>
-                        </div>
-                        <p className="text-[11px] text-slate-600 mt-1">
-                          {tx.items.map(i => `${i.qty}x ${i.product.name}`).join(', ')}
-                        </p>
-                        <span className="text-[10px] text-slate-400 block mt-0.5">📅 {getDisplayDate(tx.dateStr)} - {tx.timeStr} | Kasir: {tx.cashierName}</span>
-                      </div>
-                      <div className="text-right space-y-1">
-                        <span className="font-extrabold text-amber-600 text-sm">Rp {tx.grandTotal.toLocaleString('id-ID')}</span>
-                        <div className="flex space-x-2 justify-end">
-                          <button onClick={() => { setLastReceipt(tx); setIsReceiptModalOpen(true); }} className="text-[11px] text-slate-700 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded font-bold">Struk</button>
-                          {activeRole === 'owner' && (
-                            <button onClick={() => handleDeleteTransaction(tx.id)} className="text-[11px] text-rose-600 hover:underline">Hapus</button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+            <h3 className="font-bold text-sm sm:text-base">Riwayat Transaksi Pelanggan ({currentOutletObj.name})</h3>
+            <div className="bg-white rounded-2xl border overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[600px]">
+                <thead className="bg-slate-50 border-b">
+                  <tr>
+                    <th className="p-3">Antrean</th>
+                    <th className="p-3">Tanggal / Waktu</th>
+                    <th className="p-3">Pelanggan</th>
+                    <th className="p-3">Metode</th>
+                    <th className="p-3">HPP (Modal)</th>
+                    <th className="p-3 text-right">Total Jual</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-center">Cetak</th>
+                    {activeRole === 'owner' && <th className="p-3 text-center">Hapus</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {transactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-slate-400 italic">
+                        Belum ada riwayat transaksi di outlet ini.
+                      </td>
+                    </tr>
+                  ) : (
+                    transactions.map(t => (
+                      <tr key={t.id} className={t.status === 'voided' ? 'bg-rose-50/50' : 'hover:bg-slate-50'}>
+                        <td className="p-3 font-bold">{t.queueNum}</td>
+                        <td className="p-3 text-slate-500">
+                          <div>{getDisplayDate(t.dateStr)}</div>
+                          <div className="text-[10px]">{t.timeStr}</div>
+                        </td>
+                        <td className="p-3 font-medium">{t.customerName}</td>
+                        <td className="p-3 uppercase font-semibold">{t.paymentMethod}</td>
+                        <td className="p-3 font-bold text-rose-600">Rp {(t.totalHpp || 0).toLocaleString('id-ID')}</td>
+                        <td className="p-3 text-right font-bold">Rp {t.grandTotal.toLocaleString('id-ID')}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded font-bold ${t.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                            {t.status}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <button
+                            onClick={() => handlePrintReceipt(t)}
+                            disabled={t.status !== 'completed'}
+                            className="p-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-40 disabled:cursor-not-allowed rounded"
+                            title="Cetak struk"
+                          >
+                            <Printer className="w-3.5 h-3.5"/>
+                          </button>
+                        </td>
+                        {activeRole === 'owner' && (
+                          <td className="p-3 text-center">
+                            <button
+                              onClick={() => handleDeleteTransaction(t.id)}
+                              className="p-1 bg-rose-100 text-rose-700 hover:bg-rose-200 rounded"
+                            >
+                              <Trash2 className="w-3.5 h-3.5"/>
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
       </main>
 
-      {/* MODAL CHECKOUT PEMBAYARAN */}
-      {isCheckoutModalOpen && (
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-slate-400 flex justify-around items-center py-2 z-30 px-1">
+        <button onClick={() => setCurrentTab('pos')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'pos' ? 'text-amber-400' : ''}`}>
+          <ShoppingBag className="w-5 h-5"/>
+          <span>Kasir</span>
+        </button>
+        <button onClick={() => setCurrentTab('shift')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'shift' ? 'text-amber-400' : ''}`}>
+          <Clock className="w-5 h-5"/>
+          <span>Shift</span>
+        </button>
+        <button onClick={() => setCurrentTab('stock')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'stock' ? 'text-amber-400' : ''}`}>
+          <PackageCheck className="w-5 h-5"/>
+          <span>Stok</span>
+        </button>
+        <button onClick={() => setCurrentTab('expenses')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'expenses' ? 'text-amber-400' : ''}`}>
+          <Receipt className="w-5 h-5"/>
+          <span>Pengeluaran</span>
+        </button>
+        {activeRole === 'owner' && (
+          <>
+            <button onClick={() => setCurrentTab('products')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'products' ? 'text-amber-400' : ''}`}>
+              <Layers className="w-5 h-5"/>
+              <span>Menu</span>
+            </button>
+            <button onClick={() => setCurrentTab('reports')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'reports' ? 'text-amber-400' : ''}`}>
+              <TrendingUp className="w-5 h-5"/>
+              <span>Laporan</span>
+            </button>
+          </>
+        )}
+        <button onClick={() => setCurrentTab('history')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'history' ? 'text-amber-400' : ''}`}>
+          <Receipt className="w-5 h-5"/>
+          <span>Riwayat</span>
+        </button>
+      </div>
+
+      {/* --- MODAL BUAT OUTLET BARU --- */}
+      {isOutletModalOpen && activeRole === 'owner' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 text-xs">
-            <div className="flex justify-between items-center border-b pb-2 font-bold text-sm">
-              <span>Konfirmasi Pembayaran</span>
-              <button onClick={() => setIsCheckoutModalOpen(false)}><X className="w-4 h-4 text-slate-400"/></button>
+            <div className="flex justify-between items-center font-bold text-sm border-b pb-2">
+              <span className="flex items-center"><Store className="w-4 h-4 mr-1 text-amber-500"/> Tambah Outlet Baru</span>
+              <button onClick={() => setIsOutletModalOpen(false)}><X className="w-5 h-5 text-slate-400"/></button>
             </div>
+            <form onSubmit={handleCreateOutletFromScratch} className="space-y-3">
+              <div>
+                <label className="block mb-1 font-bold text-slate-700">Nama Outlet Baru</label>
+                <input required name="outletName" className="w-full p-2.5 border rounded-xl font-semibold" placeholder="Contoh: King Baba Cabang 2" />
+              </div>
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setIsOutletModalOpen(false)} className="flex-1 py-2.5 border rounded-xl">Batal</button>
+                <button type="submit" className="flex-1 py-2.5 bg-slate-900 text-white font-bold rounded-xl">Buat Outlet</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-            <div className="bg-slate-50 p-3 rounded-xl border space-y-1">
-              <div className="flex justify-between text-slate-500"><span>Subtotal:</span><span>Rp {subtotal.toLocaleString('id-ID')}</span></div>
-              <div className="flex justify-between font-extrabold text-slate-800 text-sm pt-1 border-t"><span>Total Tagihan:</span><span className="text-amber-600">Rp {grandTotal.toLocaleString('id-ID')}</span></div>
+      {/* --- MODAL KELOLA OUTLET --- */}
+      {isManageOutletsModalOpen && activeRole === 'owner' && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-md rounded-2xl p-5 space-y-4 text-xs">
+            <div className="flex justify-between items-center font-bold text-sm border-b pb-2">
+              <span className="flex items-center"><Settings className="w-4 h-4 mr-1 text-amber-500"/> Kelola Daftar Outlet</span>
+              <button onClick={() => setIsManageOutletsModalOpen(false)}><X className="w-5 h-5 text-slate-400"/></button>
             </div>
+            <div className="divide-y max-h-60 overflow-y-auto">
+              {outlets.map(o => (
+                <div key={o.id} className="py-2.5 flex justify-between items-center">
+                  <div>
+                    <span className="font-bold text-slate-800 text-xs block">{o.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {activeOutletId === o.id && (
+                      <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">Aktif</span>
+                    )}
+                    <button
+                      disabled={outlets.length <= 1}
+                      onClick={() => handleDeleteOutlet(o.id, o.name)}
+                      className="p-1.5 bg-rose-100 text-rose-700 hover:bg-rose-200 disabled:opacity-40 rounded-lg"
+                    >
+                      <Trash2 className="w-3.5 h-3.5"/>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setIsManageOutletsModalOpen(false)} className="w-full py-2.5 bg-slate-900 text-white font-bold rounded-xl">Tutup</button>
+          </div>
+        </div>
+      )}
 
-            <div className="space-y-2">
-              <label className="block font-bold text-slate-700">Metode Pembayaran</label>
-              <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={() => setPaymentMethod('cash')} className={`py-2 rounded-xl font-bold border ${paymentMethod === 'cash' ? 'bg-amber-500 text-slate-900 border-amber-500' : 'bg-white text-slate-700'}`}>Tunai (Cash)</button>
-                <button type="button" onClick={() => setPaymentMethod('qris')} className={`py-2 rounded-xl font-bold border ${paymentMethod === 'qris' ? 'bg-amber-500 text-slate-900 border-amber-500' : 'bg-white text-slate-700'}`}>QRIS</button>
-                <button type="button" onClick={() => setPaymentMethod('debit')} className={`py-2 rounded-xl font-bold border ${paymentMethod === 'debit' ? 'bg-amber-500 text-slate-900 border-amber-500' : 'bg-white text-slate-700'}`}>Debit</button>
+      {/* --- MODAL CUSTOMIZING PRODUCT (VARIAN) --- */}
+      {customizingProduct && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-sm">{customizingProduct.name}</h3>
+                <p className="text-[11px] text-amber-400">Pilih varian / topping pesanan</p>
+              </div>
+              <button onClick={() => setCustomizingProduct(null)} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-4 flex-1 overflow-y-auto space-y-4 text-xs">
+              {customizingProduct.customGroups.map(group => (
+                <div key={group.id} className="space-y-1.5">
+                  <h4 className="font-bold text-slate-700 uppercase text-[10px]">{group.name}</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {group.options.map(opt => {
+                      const isSelected = selectedCustoms[group.name] && (
+                        Array.isArray(selectedCustoms[group.name])
+                          ? selectedCustoms[group.name].some(o => o.name === opt.name)
+                          : selectedCustoms[group.name].name === opt.name
+                      );
+                      return (
+                        <button
+                          key={opt.name}
+                          onClick={() => {
+                            if (group.type === 'single') {
+                              setSelectedCustoms({ ...selectedCustoms, [group.name]: opt });
+                            } else {
+                              const currentList = selectedCustoms[group.name] || [];
+                              const exists = currentList.some(o => o.name === opt.name);
+                              const updated = exists ? currentList.filter(o => o.name !== opt.name) : [...currentList, opt];
+                              setSelectedCustoms({ ...selectedCustoms, [group.name]: updated });
+                            }
+                          }}
+                          className={`p-2.5 rounded-xl border text-left flex justify-between items-center transition ${isSelected ? 'border-amber-500 bg-amber-50 font-bold text-slate-900' : 'border-slate-200 bg-white text-slate-700'}`}
+                        >
+                          <span>{opt.name}</span>
+                          {opt.extraPrice > 0 && <span className="text-[10px] text-amber-600 font-bold">+Rp {opt.extraPrice}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 border-t bg-slate-50">
+              <button
+                onClick={() => addToCart(customizingProduct, selectedCustoms, 1)}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 rounded-xl text-xs transition active:scale-98"
+              >
+                + Tambahkan Ke Pesanan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL CHECKOUT PEMBAYARAN --- */}
+      {isCheckoutModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl p-5 space-y-4 text-xs max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center font-bold text-sm border-b pb-2">
+              <span>Pembayaran Transaksi</span>
+              <button onClick={() => setIsCheckoutModalOpen(false)}><X className="w-5 h-5 text-slate-400"/></button>
+            </div>
+            <div className="bg-slate-900 text-white p-3.5 rounded-xl flex justify-between items-center">
+              <span className="text-slate-300 font-medium">TOTAL HASIL</span>
+              <span className="text-xl font-bold text-amber-400">Rp {grandTotal.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="space-y-1">
+              <label className="block font-semibold text-slate-700">Metode Pembayaran</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button onClick={() => setPaymentMethod('cash')} className={`py-2 rounded-lg font-bold border ${paymentMethod === 'cash' ? 'bg-amber-500 border-amber-500 text-slate-900' : 'bg-white text-slate-700 border-slate-200'}`}>Tunai</button>
+                <button onClick={() => setPaymentMethod('qris')} className={`py-2 rounded-lg font-bold border ${paymentMethod === 'qris' ? 'bg-amber-500 border-amber-500 text-slate-900' : 'bg-white text-slate-700 border-slate-200'}`}>QRIS</button>
+                <button onClick={() => setPaymentMethod('debit')} className={`py-2 rounded-lg font-bold border ${paymentMethod === 'debit' ? 'bg-amber-500 border-amber-500 text-slate-900' : 'bg-white text-slate-700 border-slate-200'}`}>Debit</button>
               </div>
             </div>
-
-            {paymentMethod === 'cash' ? (
-              <div className="space-y-2">
-                <label className="block font-bold text-slate-700">Jumlah Uang Tunai Diberikan (Rp)</label>
+            {paymentMethod === 'cash' && (
+              <div className="space-y-2 pt-2 border-t">
+                <label className="block font-semibold text-slate-700">Uang Diterima (Rp)</label>
                 <input
                   type="number"
                   value={cashGiven}
                   onChange={(e) => setCashGiven(e.target.value)}
-                  placeholder={grandTotal}
-                  className="w-full p-2.5 border rounded-xl font-bold text-sm"
+                  placeholder="Masukkan nominal"
+                  className="w-full p-2.5 border-2 border-slate-300 focus:border-amber-500 rounded-xl font-bold text-base outline-none"
                 />
-                {Number(cashGiven) >= grandTotal && (
-                  <p className="text-emerald-600 font-bold">Kembalian: Rp {(Number(cashGiven) - grandTotal).toLocaleString('id-ID')}</p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3 pt-1">
-                <div>
-                  <label className="block mb-1 font-bold text-slate-700">Foto Bukti Pembayaran QRIS / Debit *</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={async (e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        const b64 = await fileToBase64(file);
-                        setPaymentProofPhoto(b64);
-                      }
-                    }}
-                    className="w-full text-[11px]"
-                  />
-                </div>
-                {paymentProofPhoto && (
-                  <div className="relative w-20 h-20 border rounded-lg overflow-hidden">
-                    <img src={paymentProofPhoto} alt="Bukti" className="w-full h-full object-cover" />
+                {cashGiven !== '' && (
+                  <div className={`p-2.5 rounded-xl border flex justify-between items-center ${Number(cashGiven) >= grandTotal ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-rose-50 border-rose-300 text-rose-800'}`}>
+                    <span className="font-bold text-xs">{Number(cashGiven) >= grandTotal ? 'KEMBALIAN:' : 'UANG KURANG:'}</span>
+                    <span className="text-base font-extrabold">Rp {Math.abs(Number(cashGiven) - grandTotal).toLocaleString('id-ID')}</span>
                   </div>
                 )}
-                <div>
-                  <label className="block mb-1 font-medium text-slate-500">Atau Alasan Jika Bukti Foto Tidak Ada:</label>
-                  <input
-                    value={paymentMissingReason}
-                    onChange={(e) => setPaymentMissingReason(e.target.value)}
-                    placeholder="Contoh: Mesin EDC offline / sinyal gangguan"
-                    className="w-full p-2 border rounded-xl text-[11px]"
-                  />
-                </div>
               </div>
             )}
-
+            {paymentMethod !== 'cash' && (
+              <div className="space-y-3 pt-2 border-t">
+                <label className="block font-semibold text-slate-700 flex items-center">
+                  <Camera className="w-4 h-4 mr-1 text-amber-600"/> Bukti Foto Pembayaran
+                </label>
+                <input type="file" accept="image/*" capture="environment" onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    const b64 = await fileToBase64(file);
+                    setPaymentProofPhoto(b64);
+                  }
+                }} className="w-full text-xs" />
+                {paymentProofPhoto && <img src={paymentProofPhoto} alt="Bukti" className="h-28 w-full object-cover rounded border" />}
+              </div>
+            )}
             <button
+              disabled={paymentMethod === 'cash' && Number(cashGiven) < grandTotal}
               onClick={handleProcessPayment}
-              className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl active:scale-98 transition shadow"
+              className="w-full bg-slate-900 disabled:bg-slate-300 text-white font-bold py-3 rounded-xl text-xs transition active:scale-98 shadow mt-2"
             >
-              PROSES TRANSAKSI & CETAK STRUK
+              Selesaikan Transaksi & Potong Stok
             </button>
           </div>
         </div>
       )}
 
-      {/* MODAL STRUK / RECEIPT */}
+      {/* --- MODAL STRUK --- */}
       {isReceiptModalOpen && lastReceipt && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-xs rounded-2xl p-5 space-y-4 text-xs font-mono shadow-2xl">
-            <div className="text-center space-y-1 border-b pb-3">
-              <h3 className="font-extrabold text-sm font-sans">{lastReceipt.outletName.toUpperCase()}</h3>
-              <p className="text-[10px] text-slate-500">NEXPOS F&B Management System</p>
-              <div className="pt-2 flex justify-between font-bold text-[11px]">
-                <span>No. Antrian: {lastReceipt.queueNum}</span>
-                <span>{getDisplayDate(lastReceipt.dateStr)} {lastReceipt.timeStr}</span>
-              </div>
-              <p className="text-[11px] text-left pt-1">Pelanggan: <strong>{lastReceipt.customerName}</strong> (Meja: {lastReceipt.tableNumber})</p>
-            </div>
-
-            <div className="space-y-1.5 border-b pb-3 max-h-48 overflow-y-auto">
-              {lastReceipt.items.map((item, idx) => (
-                <div key={idx} className="flex justify-between">
-                  <div>
-                    <p className="font-bold">{item.qty}x {item.product.name}</p>
-                    {item.customsSummary && <p className="text-[10px] text-slate-500">{item.customsSummary}</p>}
-                  </div>
-                  <span>Rp {(item.price * item.qty).toLocaleString('id-ID')}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-1 text-[11px]">
-              <div className="flex justify-between"><span>Subtotal:</span><span>Rp {lastReceipt.subtotal.toLocaleString('id-ID')}</span></div>
-              {lastReceipt.discountAmount > 0 && <div className="flex justify-between text-rose-600"><span>Diskon:</span><span>- Rp {lastReceipt.discountAmount.toLocaleString('id-ID')}</span></div>}
-              <div className="flex justify-between font-extrabold text-sm pt-1 border-t"><span>TOTAL:</span><span>Rp {lastReceipt.grandTotal.toLocaleString('id-ID')}</span></div>
-              <div className="flex justify-between pt-1"><span>Metode ({lastReceipt.paymentMethod.toUpperCase()}):</span><span>Rp {lastReceipt.cashGiven.toLocaleString('id-ID')}</span></div>
-              {lastReceipt.paymentMethod === 'cash' && <div className="flex justify-between"><span>Kembalian:</span><span>Rp {lastReceipt.change.toLocaleString('id-ID')}</span></div>}
-            </div>
-
-            {lastReceipt.paymentProofPhoto && (
-              <div className="pt-2 border-t text-center">
-                <span className="text-[10px] text-slate-500 block mb-1">Bukti Pembayaran QRIS/Debit:</span>
-                <img src={lastReceipt.paymentProofPhoto} alt="Bukti" className="w-24 h-24 object-cover mx-auto rounded-lg border" />
-              </div>
-            )}
-
-            <div className="pt-2 space-y-2 font-sans">
-              <button onClick={() => { window.print(); }} className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs active:scale-98 transition">
-                Cetak Struk Fisik
-              </button>
-              <button onClick={() => setIsReceiptModalOpen(false)} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl text-xs">
-                Tutup Struk
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL KELOLA / TAMBAH OUTLET */}
-      {isOutletModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 text-xs">
-            <div className="flex justify-between items-center border-b pb-2 font-bold text-sm">
-              <span>Tambah Outlet Baru (Dari Nol)</span>
-              <button onClick={() => setIsOutletModalOpen(false)}><X className="w-4 h-4 text-slate-400"/></button>
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden p-4 space-y-3 text-xs font-mono">
+            <div className="text-center font-bold">
+              <p className="text-sm">NEXPOS - {lastReceipt.outletName}</p>
+              <p className="text-[10px] text-slate-500 font-normal">Tgl: {getDisplayDate(lastReceipt.dateStr)} {lastReceipt.timeStr}</p>
             </div>
-            <form onSubmit={handleCreateOutletFromScratch} className="space-y-3">
-              <div>
-                <label className="block mb-1 font-medium">Nama Outlet / Cabang</label>
-                <input required name="outletName" className="w-full p-2.5 border rounded-xl" placeholder="Contoh: Cabang Setiabudhi" />
+            <div className="border-b border-dashed my-2"></div>
+            <div className="flex justify-between">
+              <span>Antrean: <strong>{lastReceipt.queueNum}</strong></span>
+              <span>{lastReceipt.customerName}</span>
+            </div>
+            <div className="border-b border-dashed my-2"></div>
+            {lastReceipt.items.map(i => (
+              <div key={i.cartItemId} className="flex justify-between">
+                <span>{i.qty}x {i.product.name}</span>
+                <span>Rp {(i.price * i.qty).toLocaleString('id-ID')}</span>
               </div>
-              <p className="text-[11px] text-slate-500">Outlet baru akan memiliki kategori, produk, resep HPP, dan stok yang bersih dari nol.</p>
-              <button type="submit" className="w-full bg-amber-500 font-bold py-2.5 rounded-xl text-slate-900">
-                Buat Outlet Baru
+            ))}
+            <div className="border-b border-dashed my-2"></div>
+            <div className="flex justify-between font-bold">
+              <span>TOTAL</span>
+              <span>Rp {lastReceipt.grandTotal.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <button
+                onClick={() => handlePrintReceipt(lastReceipt)}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-sans font-bold py-2.5 rounded-xl flex items-center justify-center"
+              >
+                <Printer className="w-4 h-4 mr-1.5"/>
+                Cetak / Print
               </button>
-            </form>
+              <button
+                onClick={() => setIsReceiptModalOpen(false)}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-sans font-bold py-2.5 rounded-xl"
+              >
+                Selesai
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* MODAL LIST KELOLA & HAPUS OUTLET */}
-      {isManageOutletsModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-md rounded-2xl p-5 space-y-4 text-xs">
-            <div className="flex justify-between items-center border-b pb-2 font-bold text-sm">
-              <span>Kelola Daftar Outlet NEXPOS</span>
-              <button onClick={() => setIsManageOutletsModalOpen(false)}><X className="w-4 h-4 text-slate-400"/></button>
-            </div>
-            <div className="divide-y max-h-64 overflow-y-auto">
-              {outlets.map(o => (
-                <div key={o.id} className="py-3 flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-slate-800 text-sm">{o.name}</p>
-                    <span className="text-[10px] text-slate-400">ID: {o.id}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {activeOutletId === o.id ? (
-                      <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px]">Aktif</span>
-                    ) : (
-                      <button onClick={() => { setActiveOutletId(o.id); setIsManageOutletsModalOpen(false); }} className="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">Pilih</button>
-                    )}
-                    {outlets.length > 1 && (
-                      <button onClick={() => handleDeleteOutlet(o.id, o.name)} className="bg-rose-50 text-rose-600 p-1.5 rounded hover:bg-rose-100">
-                        <Trash2 className="w-3.5 h-3.5"/>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => { setIsManageOutletsModalOpen(false); setIsOutletModalOpen(true); }} className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl">
-              + Tambah Outlet Baru
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL TAMBAH / EDIT PRODUK & HPP */}
-      {isProductModalOpen && (
+      {/* --- MODAL TAMBAH/EDIT PRODUK & KUSTOM VARIAN & RESEP HPP --- */}
+      {isProductModalOpen && activeRole === 'owner' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-lg rounded-2xl p-5 space-y-4 text-xs max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-2 font-bold text-sm">
-              <span>{editingProduct ? 'Edit Menu & Resep HPP' : 'Tambah Menu & Resep HPP Baru'}</span>
-              <button onClick={() => setIsProductModalOpen(false)}><X className="w-4 h-4 text-slate-400"/></button>
+            <div className="flex justify-between font-bold text-sm border-b pb-2">
+              <span>{editingProduct ? 'Edit Menu & Varian' : 'Tambah Menu Baru & Varian'}</span>
+              <button onClick={() => setIsProductModalOpen(false)}><X className="w-5 h-5 text-slate-400"/></button>
             </div>
-            <form onSubmit={handleSaveProduct} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 font-medium">Nama Produk</label>
-                  <input required name="prodName" defaultValue={editingProduct?.name || ''} className="w-full p-2 border rounded-xl" placeholder="Contoh: Es Kopi Susu" />
-                </div>
-                <div>
-                  <label className="block mb-1 font-medium">Kategori</label>
-                  <input required name="category" defaultValue={editingProduct?.category || 'Minuman'} className="w-full p-2 border rounded-xl" placeholder="Minuman / Makanan" />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block mb-1 font-medium">Harga Dine-In</label>
-                  <input required type="number" name="priceDineIn" defaultValue={editingProduct?.prices?.dineIn || 10000} className="w-full p-2 border rounded-xl font-bold" />
-                </div>
-                <div>
-                  <label className="block mb-1 font-medium">Harga Takeaway</label>
-                  <input required type="number" name="priceTakeaway" defaultValue={editingProduct?.prices?.takeaway || 10000} className="w-full p-2 border rounded-xl font-bold" />
-                </div>
-                <div>
-                  <label className="block mb-1 font-medium">Harga Online</label>
-                  <input required type="number" name="priceOnline" defaultValue={editingProduct?.prices?.online || 12000} className="w-full p-2 border rounded-xl font-bold" />
-                </div>
-              </div>
-
+            <form onSubmit={handleSaveProduct} className="space-y-3">
               <div>
-                <label className="block mb-1 font-medium">URL Gambar Produk</label>
-                <input name="imageUrl" defaultValue={editingProduct?.image || ''} className="w-full p-2 border rounded-xl" placeholder="https://..." />
-              </div>
-
-              {/* RESEP / HPP BAHAN BAKU */}
-              <div className="space-y-2 pt-2 border-t">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-800">Komposisi Resep & HPP Bahan</span>
-                  <button type="button" onClick={handleAddRecipeItem} className="bg-amber-100 text-amber-800 font-bold px-2 py-1 rounded text-[11px]">
-                    + Tambah Bahan Resep
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {formRecipe.map((rec, idx) => (
-                    <div key={idx} className="flex items-center space-x-2 bg-slate-50 p-2 rounded-xl border">
-                      <select
-                        value={rec.ingredientId}
-                        onChange={(e) => {
-                          const updated = [...formRecipe];
-                          updated[idx].ingredientId = e.target.value;
-                          setFormRecipe(updated);
-                        }}
-                        className="flex-1 p-1.5 border rounded-lg bg-white text-xs"
-                      >
-                        {ingredients.map(ing => (
-                          <option key={ing.id} value={ing.id}>{ing.name} (Rp {ing.costPerUnit}/{ing.unit})</option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        value={rec.qty}
-                        onChange={(e) => {
-                          const updated = [...formRecipe];
-                          updated[idx].qty = Number(e.target.value);
-                          setFormRecipe(updated);
-                        }}
-                        placeholder="Jumlah"
-                        className="w-20 p-1.5 border rounded-lg bg-white text-xs"
-                      />
-                      <button type="button" onClick={() => setFormRecipe(formRecipe.filter((_, i) => i !== idx))} className="text-rose-600 p-1">
-                        <Trash2 className="w-4 h-4"/>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* GRUP VARIAN / CUSTOMIZATION */}
-              <div className="space-y-2 pt-2 border-t">
-                <span className="font-bold text-slate-800 block">Varian / Tambahan (Topping / Level Es)</span>
-                <div className="flex space-x-2">
-                  <input
-                    value={newGroupNameInput}
-                    onChange={(e) => setNewGroupNameInput(e.target.value)}
-                    placeholder="Nama Grup (cth: Level Manis)"
-                    className="flex-1 p-2 border rounded-xl text-xs"
-                  />
-                  <select value={newGroupTypeInput} onChange={(e) => setNewGroupTypeInput(e.target.value)} className="p-2 border rounded-xl text-xs bg-white">
-                    <option value="single">Pilihan Tunggal</option>
-                    <option value="multiple">Pilihan Banyak</option>
-                  </select>
-                  <button type="button" onClick={handleAddGroupToProductForm} className="bg-slate-900 text-white font-bold px-3 py-2 rounded-xl text-xs">
-                    + Grup
-                  </button>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  {formCustomGroups.map((group, gIdx) => (
-                    <div key={group.id} className="bg-slate-50 p-3 rounded-xl border space-y-2">
-                      <div className="flex justify-between items-center font-bold text-slate-800">
-                        <span>{group.name} ({group.type})</span>
-                        <button type="button" onClick={() => handleRemoveGroupFromForm(group.id)} className="text-rose-600 text-[10px]">Hapus Grup</button>
-                      </div>
-
-                      <div className="space-y-1">
-                        {group.options.map((opt, oIdx) => (
-                          <div key={oIdx} className="flex justify-between items-center bg-white p-1.5 rounded-lg border text-[11px]">
-                            <span>{opt.name} (+Rp {opt.extraPrice})</span>
-                            <button type="button" onClick={() => handleRemoveOptionFromGroup(group.id, oIdx)} className="text-rose-500">Hapus</button>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="flex space-x-2 pt-1">
-                        <input id={`opt-name-${group.id}`} placeholder="Nama Opsi (cth: Less Sugar)" className="flex-1 p-1.5 border rounded-lg text-[11px]" />
-                        <input id={`opt-price-${group.id}`} type="number" placeholder="Harga Extra" className="w-24 p-1.5 border rounded-lg text-[11px]" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nameInput = document.getElementById(`opt-name-${group.id}`);
-                            const priceInput = document.getElementById(`opt-price-${group.id}`);
-                            if (!nameInput.value.trim()) return;
-                            const newOpt = { name: nameInput.value.trim(), extraPrice: Number(priceInput.value) || 0 };
-                            setFormCustomGroups(formCustomGroups.map(g => g.id === group.id ? { ...g, options: [...g.options, newOpt] } : g));
-                            nameInput.value = '';
-                            priceInput.value = '';
-                          }}
-                          className="bg-amber-500 font-bold px-3 py-1 rounded-lg text-[11px]"
-                        >
-                          + Opsi
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex space-x-2 pt-3">
-                <button type="button" onClick={() => setIsProductModalOpen(false)} className="flex-1 py-2.5 border rounded-xl font-bold">Batal</button>
-                <button type="submit" className="flex-1 py-2.5 bg-amber-500 text-slate-900 font-bold rounded-xl">Simpan Menu</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL TAMBAH BAHAN BAKU */}
-      {isIngredientModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 text-xs">
-            <div className="flex justify-between items-center border-b pb-2 font-bold text-sm">
-              <span>Tambah Bahan Baku Gudang ({currentOutletObj.name})</span>
-              <button onClick={() => setIsIngredientModalOpen(false)}><X className="w-4 h-4 text-slate-400"/></button>
-            </div>
-            <form onSubmit={handleCreateNewIngredient} className="space-y-3">
-              <div>
-                <label className="block mb-1 font-medium">Nama Bahan Baku</label>
-                <input required name="ingName" className="w-full p-2 border rounded-xl" placeholder="Contoh: Bubuk Matcha" />
+                <label className="block mb-1 font-medium">Nama Menu</label>
+                <input required name="prodName" defaultValue={editingProduct ? editingProduct.name : ''} className="w-full p-2 border rounded-xl" placeholder="Misal: King Baba Coklat Large" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block mb-1 font-medium">Satuan</label>
-                  <select name="ingUnit" className="w-full p-2 border rounded-xl bg-white">
-                    <option value="gram">gram</option>
-                    <option value="ml">ml</option>
-                    <option value="pcs">pcs</option>
-                    <option value="kg">kg</option>
-                    <option value="liter">liter</option>
-                  </select>
+                  <label className="block mb-1 font-medium">Kategori</label>
+                  <input required name="category" defaultValue={editingProduct ? editingProduct.category : 'King Baba'} className="w-full p-2 border rounded-xl" />
                 </div>
                 <div>
-                  <label className="block mb-1 font-medium">Biaya HPP / Unit (Rp)</label>
+                  <label className="block mb-1 font-medium">Harga Jual Dine-In (Rp)</label>
+                  <input required type="number" name="priceDineIn" defaultValue={editingProduct ? editingProduct.prices.dineIn : ''} className="w-full p-2 border rounded-xl" placeholder="10000" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block mb-1 font-medium">Harga Takeaway (Rp)</label>
+                  <input required type="number" name="priceTakeaway" defaultValue={editingProduct ? editingProduct.prices.takeaway : ''} className="w-full p-2 border rounded-xl" placeholder="10000" />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium">Harga Online (Rp)</label>
+                  <input required type="number" name="priceOnline" defaultValue={editingProduct ? editingProduct.prices.online : ''} className="w-full p-2 border rounded-xl" placeholder="12000" />
+                </div>
+              </div>
+              <div>
+                <label className="block mb-1 font-medium">URL Gambar</label>
+                <input name="imageUrl" defaultValue={editingProduct ? editingProduct.image : ''} className="w-full p-2 border rounded-xl" placeholder="https://..." />
+              </div>
+
+              {/* PENGATURAN VARIAN & TOPPING MENU */}
+              <div className="pt-3 border-t space-y-3">
+                <h4 className="font-bold text-slate-800">Kelola Varian & Topping Menu</h4>
+                
+                <div className="p-3 bg-slate-50 rounded-xl border space-y-2">
+                  <span className="font-semibold text-slate-700 block">Buat Grup Varian Baru</span>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Nama Grup (Topping, Level, dll)"
+                      value={newGroupNameInput}
+                      onChange={(e) => setNewGroupNameInput(e.target.value)}
+                      className="flex-1 p-1.5 border rounded-lg bg-white"
+                    />
+                    <select
+                      value={newGroupTypeInput}
+                      onChange={(e) => setNewGroupTypeInput(e.target.value)}
+                      className="p-1.5 border rounded-lg bg-white"
+                    >
+                      <option value="single">Pilih 1</option>
+                      <option value="multiple">Banyak</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleAddGroupToProductForm}
+                      className="bg-amber-500 font-bold px-3 py-1.5 rounded-lg text-slate-900"
+                    >
+                      + Buat Grup
+                    </button>
+                  </div>
+                </div>
+
+                {formCustomGroups.map((group) => (
+                  <div key={group.id} className="p-3 border rounded-xl space-y-2 bg-white">
+                    <div className="flex justify-between items-center font-bold text-slate-800">
+                      <span>{group.name} ({group.type === 'single' ? 'Pilih 1' : 'Pilih Banyak'})</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGroupFromForm(group.id)}
+                        className="text-rose-600 text-[11px] hover:underline"
+                      >
+                        Hapus Grup
+                      </button>
+                    </div>
+
+                    <div className="flex gap-1.5 items-center bg-slate-50 p-2 rounded-lg">
+                      <input
+                        type="text"
+                        id={`opt_name_${group.id}`}
+                        placeholder="Nama Opsi (Misal: Extra Boba)"
+                        className="flex-1 p-1 border rounded text-xs bg-white"
+                      />
+                      <input
+                        type="number"
+                        id={`opt_price_${group.id}`}
+                        placeholder="+Biaya (Rp)"
+                        className="w-24 p-1 border rounded text-xs bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nameInput = document.getElementById(`opt_name_${group.id}`);
+                          const priceInput = document.getElementById(`opt_price_${group.id}`);
+                          if (!nameInput.value.trim()) {
+                            alert('Masukkan nama opsi varian!');
+                            return;
+                          }
+                          const newOpt = {
+                            name: nameInput.value.trim(),
+                            extraPrice: Number(priceInput.value) || 0
+                          };
+                          setFormCustomGroups(formCustomGroups.map(g => g.id === group.id ? { ...g, options: [...g.options, newOpt] } : g));
+                          nameInput.value = '';
+                          priceInput.value = '';
+                        }}
+                        className="bg-slate-900 text-white font-bold px-2.5 py-1 rounded text-xs"
+                      >
+                        + Opsi
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {group.options.map((opt, optIdx) => (
+                        <span key={optIdx} className="bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] flex items-center">
+                          <span className="font-medium text-slate-800">{opt.name}</span>
+                          {opt.extraPrice > 0 && <span className="text-amber-700 font-bold ml-1">(+Rp{opt.extraPrice.toLocaleString('id-ID')})</span>}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveOptionFromGroup(group.id, optIdx)}
+                            className="text-rose-500 font-bold ml-2 hover:text-rose-700"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* PENGATURAN RESEP BAHAN BAKU & HPP OTOMATIS */}
+              <div className="pt-3 border-t space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-slate-800">Kustomisasi Resep HPP (Bahan yang Dipotong)</span>
+                  <button type="button" onClick={handleAddRecipeItem} className="bg-slate-900 text-white px-2.5 py-1 rounded text-[11px] font-bold">
+                    + Tambah Bahan Resep
+                  </button>
+                </div>
+
+                {formRecipe.length === 0 ? (
+                  <p className="text-slate-400 italic text-[11px]">Belum ada bahan resep yang dipilih. HPP akan bernilai 0.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {formRecipe.map((rec, index) => (
+                      <div key={index} className="flex items-center space-x-2 bg-slate-50 p-2 rounded-lg">
+                        <select
+                          value={rec.ingredientId}
+                          onChange={(e) => {
+                            const updated = [...formRecipe];
+                            updated[index].ingredientId = e.target.value;
+                            setFormRecipe(updated);
+                          }}
+                          className="flex-1 p-1.5 border rounded bg-white"
+                        >
+                          {ingredients.map(ing => (
+                            <option key={ing.id} value={ing.id}>
+                              {ing.name} (Rp {ing.costPerUnit}/{ing.unit})
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          value={rec.qty}
+                          onChange={(e) => {
+                            const updated = [...formRecipe];
+                            updated[index].qty = Number(e.target.value);
+                            setFormRecipe(updated);
+                          }}
+                          placeholder="Jumlah"
+                          className="w-20 p-1.5 border rounded bg-white text-center font-bold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setFormRecipe(formRecipe.filter((_, idx) => idx !== index))}
+                          className="text-rose-600 p-1 font-bold"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg flex justify-between font-bold text-slate-800">
+                      <span>Estimasi Total HPP (Modal):</span>
+                      <span className="text-amber-700">Rp {calculateProductHPP(formRecipe).toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-3 flex justify-end space-x-2">
+                <button type="button" onClick={() => setIsProductModalOpen(false)} className="px-3 py-2 border rounded-xl">Batal</button>
+                <button type="submit" className="px-3 py-2 bg-amber-500 font-bold rounded-xl text-slate-900">Simpan Menu</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL TAMBAH BAHAN BAKU & COST --- */}
+      {isIngredientModalOpen && activeRole === 'owner' && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-3 text-xs">
+            <h4 className="font-bold text-sm text-slate-800">Tambah Bahan Baku & HPP Unit</h4>
+            <form onSubmit={handleCreateNewIngredient} className="space-y-3">
+              <div>
+                <label className="block mb-1 font-medium">Nama Bahan (Misal: Bubuk Coklat)</label>
+                <input required name="ingName" className="w-full p-2 border rounded-xl" placeholder="Nama bahan" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block mb-1 font-medium">Satuan (gram/ml/pcs)</label>
+                  <input required name="ingUnit" className="w-full p-2 border rounded-xl" placeholder="gram" />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium">Biaya per Unit (Rp)</label>
                   <input required type="number" name="costPerUnit" className="w-full p-2 border rounded-xl font-bold" placeholder="50" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block mb-1 font-medium">Stok Awal</label>
-                  <input required type="number" name="ingStock" className="w-full p-2 border rounded-xl" placeholder="1000" />
+                  <input required type="number" name="ingStock" className="w-full p-2 border rounded-xl" placeholder="5000" />
                 </div>
                 <div>
-                  <label className="block mb-1 font-medium">Min. Stok (Alert)</label>
-                  <input required type="number" name="ingMinStock" className="w-full p-2 border rounded-xl" placeholder="100" />
+                  <label className="block mb-1 font-medium">Min. Stok</label>
+                  <input required type="number" name="ingMinStock" className="w-full p-2 border rounded-xl" placeholder="500" />
                 </div>
               </div>
-              <div className="flex space-x-2 pt-2">
-                <button type="button" onClick={() => setIsIngredientModalOpen(false)} className="flex-1 py-2 border rounded-xl">Batal</button>
-                <button type="submit" className="flex-1 py-2 bg-amber-500 font-bold rounded-xl text-slate-900">Simpan Bahan</button>
+              <div className="flex justify-end space-x-2 pt-2">
+                <button type="button" onClick={() => setIsIngredientModalOpen(false)} className="px-3 py-2 border rounded-xl">Batal</button>
+                <button type="submit" className="px-3 py-2 bg-slate-900 text-white font-bold rounded-xl">Simpan Bahan</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* --- MODAL RESTOK BAHAN BAKU --- */}
-      {isRestockModalOpen && selectedIngredientForRestock && activeRole === 'owner' && (
+      {/* --- MODAL RESTOK --- */}
+      {isRestockModalOpen && selectedIngredientForRestock && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-3 text-xs">
-            <h4 className="font-bold text-sm text-slate-800">Restok Bahan: {selectedIngredientForRestock.name}</h4>
-            <p className="text-[11px] text-slate-500">Stok saat ini: <strong>{selectedIngredientForRestock.stock} {selectedIngredientForRestock.unit}</strong></p>
+          <div className="bg-white w-full max-w-xs rounded-2xl p-5 space-y-3 text-xs">
+            <h4 className="font-bold text-sm text-slate-800">Restok Bahan Baku</h4>
+            <p className="text-slate-500">Bahan: <strong>{selectedIngredientForRestock.name}</strong></p>
             <form onSubmit={handleRestockSubmit} className="space-y-3">
               <div>
-                <label className="block mb-1 font-medium">Jumlah Penambahan Stok ({selectedIngredientForRestock.unit})</label>
-                <input required type="number" name="addStock" className="w-full p-2.5 border rounded-xl font-bold" placeholder="1000" />
+                <label className="block mb-1 font-medium">Jumlah Tambahan ({selectedIngredientForRestock.unit})</label>
+                <input required type="number" name="addStock" className="w-full p-2 border rounded-xl font-bold" placeholder="1000" />
               </div>
-              <div className="flex space-x-2 pt-2">
+              <div className="flex space-x-2">
                 <button type="button" onClick={() => setIsRestockModalOpen(false)} className="flex-1 py-2 border rounded-xl">Batal</button>
-                <button type="submit" className="flex-1 py-2 bg-slate-900 text-white font-bold rounded-xl">Konfirmasi Restok</button>
+                <button type="submit" className="flex-1 py-2 bg-slate-900 text-white font-bold rounded-xl">Simpan</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* --- MODAL PIN PASSWORD OWNER --- */}
+      {/* --- MODAL EMAIL LAPORAN --- */}
+      {isEmailModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white max-w-lg w-full rounded-2xl p-5 space-y-4 text-xs">
+            <div className="flex justify-between items-center font-bold border-b pb-2">
+              <span>Kirim Laporan Lengkap via Email</span>
+              <button onClick={() => setIsEmailModalOpen(false)}><X className="w-5 h-5"/></button>
+            </div>
+            <a
+              href={`mailto:owner@outlet.com?subject=Laporan HPP & Keuangan - ${currentOutletObj.name}&body=Halo Owner, Laporan Keuangan Telah Disiapkan.`}
+              className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-center block"
+            >
+              Buka Aplikasi Email
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL PIN OWNER --- */}
       {isPinModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-xs rounded-2xl p-5 space-y-4 text-xs text-center">
-            <div className="flex justify-between items-center border-b pb-2 font-bold text-sm">
-              <span>Verifikasi PIN Owner</span>
-              <button onClick={() => setIsPinModalOpen(false)}><X className="w-4 h-4 text-slate-400"/></button>
-            </div>
-            <p className="text-slate-500">Masukkan PIN akses untuk masuk ke Mode Owner. (Default: 1234)</p>
+          <div className="bg-white w-full max-w-xs rounded-2xl p-6 text-center space-y-3">
+            <h4 className="font-bold text-sm">Masukkan PIN Owner</h4>
+            <p className="text-[11px] text-slate-400">PIN Default: 1234</p>
             <input
               type="password"
-              maxLength={4}
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
-              placeholder="••••"
-              className="w-full p-3 text-center tracking-widest text-lg font-bold border rounded-xl outline-none focus:border-amber-500"
+              className="w-full text-center border p-2 rounded-xl text-lg font-bold"
+              placeholder="****"
             />
-            <button
-              onClick={handlePinSubmit}
-              className="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl active:scale-98 transition"
-            >
-              Masuk Mode Owner
-            </button>
+            <div className="flex space-x-2">
+              <button onClick={() => setIsPinModalOpen(false)} className="flex-1 py-2 border rounded-xl text-xs">Batal</button>
+              <button onClick={handlePinSubmit} className="flex-1 py-2 bg-slate-900 text-white font-bold rounded-xl text-xs">Masuk</button>
+            </div>
           </div>
         </div>
       )}
@@ -1953,3 +2257,14 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
     </div>
   );
 }
+const [outletSettingsMap, setOutletSettingsMap] = useState(() => {
+  const saved = localStorage.getItem('nexpos_outlet_settings_map');
+  return saved ? JSON.parse(saved) : {
+    out_1: {
+      storeName: 'NEXPOS STORE',
+      address: 'Jl. Contoh No. 123, Tasikmalaya',
+      phone: '081234567890',
+      footerMessage: 'Terima kasih atas kunjungan Anda!'
+    }
+  };
+});
