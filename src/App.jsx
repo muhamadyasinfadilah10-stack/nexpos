@@ -1009,7 +1009,7 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           <button onClick={() => setCurrentTab('history')} className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center ${currentTab === 'history' ? 'bg-amber-500 text-slate-900 font-bold' : 'text-slate-300 hover:bg-slate-800'}`}><Receipt className="w-4 h-4 mr-1"/>Riwayat</button>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5 sm:space-x-2">
           {activeRole === 'owner' ? (
             <div className="flex items-center space-x-1.5">
               <button
