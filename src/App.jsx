@@ -25,7 +25,8 @@ import {
   ChevronRight,
   Settings,
   Calculator,
-  Printer
+  LogOut,
+  Key
 } from 'lucide-react';
 
 // --- HELPER FORMAT TANGGAL & WAKTU ---
@@ -92,7 +93,7 @@ const INITIAL_PRODUCTS = [
         name: 'Extra Topping',
         type: 'multiple',
         options: [
-          { name: 'Extra Boba', extraPrice: 3000, ingredientId: 'ing_4', stockQty: 30 }
+          { name: 'Extra Boba', extraPrice: 3000 }
         ]
       }
     ]
@@ -100,6 +101,22 @@ const INITIAL_PRODUCTS = [
 ];
 
 export default function App() {
+  // --- STATE LOGIN & AUTH ---
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('nexpos_is_logged_in') === 'true';
+  });
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('nexpos_current_user');
+    return saved ? JSON.parse(saved) : null; // { username, role }
+  });
+
+  // Password / PIN Owner Storage
+  const [ownerPin, setOwnerPin] = useState(() => {
+    return localStorage.getItem('nexpos_owner_pin') || '1234';
+  });
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+
+  // --- STATE UTAMA APLIKASI ---
   const [outlets, setOutlets] = useState(() => {
     const saved = localStorage.getItem('nexpos_outlets');
     return saved ? JSON.parse(saved) : INITIAL_OUTLETS;
@@ -112,23 +129,6 @@ export default function App() {
 
   const [isOutletModalOpen, setIsOutletModalOpen] = useState(false);
   const [isManageOutletsModalOpen, setIsManageOutletsModalOpen] = useState(false);
-
-  const [activeRole, setActiveRole] = useState('cashier');
-  const [pinInput, setPinInput] = useState('');
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [pinPurpose, setPinPurpose] = useState(null);
-
-  const [outletSettingsMap, setOutletSettingsMap] = useState(() => {
-    const saved = localStorage.getItem('nexpos_outlet_settings_map');
-    return saved ? JSON.parse(saved) : {
-      out_1: {
-        storeName: 'NEXPOS STORE',
-        address: 'Jl. Contoh No. 123, Tasikmalaya',
-        phone: '081234567890',
-        footerMessage: 'Terima kasih atas kunjungan Anda!'
-      }
-    };
-  });
 
   const [currentTab, setCurrentTab] = useState('pos');
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
@@ -173,6 +173,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : { out_1: [] };
   });
 
+  // --- EFFECT LOCALSTORAGE ---
   useEffect(() => { localStorage.setItem('nexpos_outlets', JSON.stringify(outlets)); }, [outlets]);
   useEffect(() => { localStorage.setItem('nexpos_active_outlet_id', JSON.stringify(activeOutletId)); }, [activeOutletId]);
   useEffect(() => { localStorage.setItem('nexpos_categories_map', JSON.stringify(categoriesMap)); }, [categoriesMap]);
@@ -183,7 +184,13 @@ export default function App() {
   useEffect(() => { localStorage.setItem('nexpos_shift_history_map', JSON.stringify(shiftHistoryMap)); }, [shiftHistoryMap]);
   useEffect(() => { localStorage.setItem('nexpos_transactions_map', JSON.stringify(transactionsMap)); }, [transactionsMap]);
   useEffect(() => { localStorage.setItem('nexpos_expenses_map', JSON.stringify(expensesMap)); }, [expensesMap]);
+  useEffect(() => { localStorage.setItem('nexpos_owner_pin', ownerPin); }, [ownerPin]);
+  useEffect(() => { 
+    localStorage.setItem('nexpos_is_logged_in', isLoggedIn); 
+    localStorage.setItem('nexpos_current_user', JSON.stringify(currentUser));
+  }, [isLoggedIn, currentUser]);
 
+  const activeRole = currentUser ? currentUser.role : 'cashier';
   const currentOutletObj = outlets.find(o => o.id === activeOutletId) || outlets[0] || { id: 'out_1', name: 'Outlet Utama' };
   
   const categories = categoriesMap[activeOutletId] || ['Semua', 'Makanan', 'Minuman'];
@@ -215,7 +222,6 @@ export default function App() {
   const [orderType, setOrderType] = useState('dineIn');
   const [cart, setCart] = useState([]);
   
-  // State Input Pelanggan yang Independen agar Tidak Lag/Reset saat Mengetik
   const [customerName, setCustomerName] = useState('');
   const [tableNumber, setTableNumber] = useState('');
 
@@ -251,6 +257,59 @@ export default function App() {
   const [reportFilterType, setReportFilterType] = useState('daily');
   const [reportDate, setReportDate] = useState(getFormattedDate());
   const [reportMonth, setReportMonth] = useState(getFormattedMonth());
+
+  // --- HANDLER LOGIN & LOGOUT ---
+  const handleLoginSubmit = (e) => {
+    e.preventDefault();
+    const role = e.target.loginRole.value;
+    const inputPass = e.target.loginPassword.value;
+
+    if (role === 'owner') {
+      if (inputPass === ownerPin) {
+        setIsLoggedIn(true);
+        setCurrentUser({ username: 'Owner Utama', role: 'owner' });
+      } else {
+        alert('PIN / Password Owner Salah! (Default: 1234)');
+      }
+    } else {
+      // Kasir tidak wajib password rumit atau bebas masuk
+      setIsLoggedIn(true);
+      setCurrentUser({ username: e.target.cashierUser.value || 'Kasir Toko', role: 'cashier' });
+    }
+  };
+
+  const handleLogout = () => {
+    if (confirm('Apakah Anda ingin keluar (Logout) dari sistem?')) {
+      setIsLoggedIn(false);
+      setCurrentUser(null);
+      setCart([]);
+    }
+  };
+
+  const handleChangePasswordSubmit = (e) => {
+    e.preventDefault();
+    const oldPin = e.target.oldPin.value;
+    const newPin = e.target.newPin.value;
+    const confirmPin = e.target.confirmPin.value;
+
+    if (oldPin !== ownerPin) {
+      alert('PIN Lama salah!');
+      return;
+    }
+    if (newPin !== confirmPin) {
+      alert('Konfirmasi PIN baru tidak sesuai!');
+      return;
+    }
+    if (newPin.length < 4) {
+      alert('PIN minimal 4 karakter/angka!');
+      return;
+    }
+
+    setOwnerPin(newPin);
+    setIsChangePasswordModalOpen(false);
+    alert('PIN Owner berhasil diubah! Gunakan PIN baru untuk login selanjutnya.');
+    e.target.reset();
+  };
 
   const calculateProductHPP = (recipeList) => {
     if (!recipeList || recipeList.length === 0) return 0;
@@ -317,19 +376,6 @@ export default function App() {
     }
   };
 
-  const handlePinSubmit = () => {
-    if (pinInput === '1234') {
-      if (pinPurpose === 'switch_owner') {
-        setActiveRole('owner');
-        setIsPinModalOpen(false);
-      }
-      setPinInput('');
-    } else {
-      alert('PIN Salah! (PIN Default Owner: 1234)');
-      setPinInput('');
-    }
-  };
-
   const handleSelectProduct = (product) => {
     if (product.customGroups && product.customGroups.length > 0) {
       setCustomizingProduct(product);
@@ -368,14 +414,7 @@ export default function App() {
     }
 
     const finalPrice = unitPrice + extraCost;
-    const toppingHpp = Object.values(customs || {}).reduce((total, val) => {
-      const options = Array.isArray(val) ? val : (val && val.name ? [val] : []);
-      return total + options.reduce((sum, opt) => {
-        const ing = opt.ingredientId ? ingredients.find(i => i.id === opt.ingredientId) : null;
-        return sum + ((Number(opt.stockQty) || 0) * (Number(ing?.costPerUnit) || 0));
-      }, 0);
-    }, 0);
-    const itemHpp = calculateProductHPP(product.recipe) + toppingHpp;
+    const itemHpp = calculateProductHPP(product.recipe);
     const cartItemId = product.id + '-' + customSummary.sort().join('-') + '-' + orderType;
 
     setCart(prev => {
@@ -386,7 +425,6 @@ export default function App() {
       return [...prev, {
         cartItemId,
         product,
-        customs: JSON.parse(JSON.stringify(customs || {})),
         customsSummary: customSummary.join(', '),
         price: finalPrice,
         hpp: itemHpp,
@@ -429,47 +467,18 @@ export default function App() {
       }
     }
 
-    // Hitung seluruh bahan yang akan terpakai: resep menu + topping/varian yang terhubung ke stok.
-    const stockUsage = {};
-    const addStockUsage = (ingredientId, qty) => {
-      if (!ingredientId) return;
-      stockUsage[ingredientId] = (stockUsage[ingredientId] || 0) + (Number(qty) || 0);
-    };
-
+    let updatedIngredients = [...ingredients];
     cart.forEach(cartItem => {
       const productRecipe = cartItem.product.recipe || [];
       productRecipe.forEach(recipeItem => {
-        addStockUsage(recipeItem.ingredientId, (Number(recipeItem.qty) || 0) * cartItem.qty);
-      });
-
-      Object.values(cartItem.customs || {}).forEach(val => {
-        const options = Array.isArray(val) ? val : (val && val.name ? [val] : []);
-        options.forEach(opt => {
-          addStockUsage(opt.ingredientId, (Number(opt.stockQty) || 0) * cartItem.qty);
+        const consumedQty = (Number(recipeItem.qty) || 0) * cartItem.qty;
+        updatedIngredients = updatedIngredients.map(ing => {
+          if (ing.id === recipeItem.ingredientId) {
+            return { ...ing, stock: Math.max(0, ing.stock - consumedQty) };
+          }
+          return ing;
         });
       });
-    });
-
-    const insufficientStock = Object.entries(stockUsage)
-      .map(([ingredientId, usedQty]) => {
-        const ing = ingredients.find(i => i.id === ingredientId);
-        return ing && usedQty > Number(ing.stock)
-          ? { ...ing, usedQty }
-          : null;
-      })
-      .filter(Boolean);
-
-    if (insufficientStock.length > 0) {
-      const detail = insufficientStock
-        .map(ing => `${ing.name}: stok ${ing.stock} ${ing.unit}, dibutuhkan ${ing.usedQty} ${ing.unit}`)
-        .join('\n');
-      alert(`Stok tidak mencukupi untuk menyelesaikan transaksi:\n\n${detail}`);
-      return;
-    }
-
-    let updatedIngredients = ingredients.map(ing => {
-      const usedQty = stockUsage[ing.id] || 0;
-      return usedQty > 0 ? { ...ing, stock: Math.max(0, Number(ing.stock) - usedQty) } : ing;
     });
     setIngredients(updatedIngredients);
 
@@ -711,119 +720,6 @@ export default function App() {
     }
   };
 
-  // --- CETAK STRUK TRANSAKSI ---
-  const handlePrintReceipt = (receipt) => {
-    if (!receipt) return;
-
-    const itemsHtml = receipt.items.map(item => `
-      <tr>
-        <td style="padding:4px 0;vertical-align:top;">
-          ${item.qty}x ${item.product.name}
-          ${item.customsSummary ? `<div style="font-size:10px;color:#555;">${item.customsSummary}</div>` : ''}
-        </td>
-        <td style="padding:4px 0;text-align:right;vertical-align:top;white-space:nowrap;">
-          Rp ${(item.price * item.qty).toLocaleString('id-ID')}
-        </td>
-      </tr>
-    `).join('');
-
-    const paymentLabel = {
-      cash: 'TUNAI',
-      qris: 'QRIS',
-      debit: 'DEBIT'
-    }[receipt.paymentMethod] || String(receipt.paymentMethod || '').toUpperCase();
-
-    const printWindow = window.open('', '_blank', 'width=420,height=700');
-
-    if (!printWindow) {
-      alert('Popup diblokir browser. Izinkan popup untuk mencetak struk.');
-      return;
-    }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="id">
-      <head>
-        <meta charset="UTF-8" />
-        <title>Struk ${receipt.queueNum} - ${receipt.outletName}</title>
-        <style>
-          @page { size: 80mm auto; margin: 4mm; }
-          * { box-sizing: border-box; }
-          body {
-            margin: 0;
-            padding: 0;
-            width: 72mm;
-            font-family: "Courier New", monospace;
-            font-size: 12px;
-            color: #000;
-            background: #fff;
-          }
-          .receipt { width: 100%; }
-          .center { text-align: center; }
-          .bold { font-weight: 700; }
-          .muted { color: #555; font-size: 10px; }
-          .line { border-top: 1px dashed #000; margin: 8px 0; }
-          table { width: 100%; border-collapse: collapse; }
-          .info td { padding: 2px 0; }
-          .total td { font-weight: 700; font-size: 14px; padding-top: 6px; }
-          .footer { text-align: center; margin-top: 12px; font-size: 10px; }
-        </style>
-      </head>
-      <body>
-        <div class="receipt">
-          <div class="center bold" style="font-size:16px;">NEXPOS</div>
-          <div class="center bold">${receipt.outletName}</div>
-          <div class="center muted">${getDisplayDate(receipt.dateStr)} ${receipt.timeStr}</div>
-
-          <div class="line"></div>
-
-          <table class="info">
-            <tr><td>Antrean</td><td style="text-align:right;" class="bold">${receipt.queueNum}</td></tr>
-            <tr><td>Pelanggan</td><td style="text-align:right;">${receipt.customerName}</td></tr>
-            <tr><td>Meja</td><td style="text-align:right;">${receipt.tableNumber || '-'}</td></tr>
-            <tr><td>Pesanan</td><td style="text-align:right;">${receipt.orderType === 'dineIn' ? 'Dine-In' : receipt.orderType === 'takeaway' ? 'Takeaway' : 'Online'}</td></tr>
-          </table>
-
-          <div class="line"></div>
-          <table>${itemsHtml}</table>
-          <div class="line"></div>
-
-          <table>
-            <tr><td>Subtotal</td><td style="text-align:right;">Rp ${receipt.subtotal.toLocaleString('id-ID')}</td></tr>
-            ${receipt.discountAmount > 0 ? `<tr><td>Diskon</td><td style="text-align:right;">- Rp ${receipt.discountAmount.toLocaleString('id-ID')}</td></tr>` : ''}
-            <tr class="total"><td>TOTAL</td><td style="text-align:right;">Rp ${receipt.grandTotal.toLocaleString('id-ID')}</td></tr>
-          </table>
-
-          <div class="line"></div>
-
-          <table class="info">
-            <tr><td>Pembayaran</td><td style="text-align:right;">${paymentLabel}</td></tr>
-            ${receipt.paymentMethod === 'cash' ? `
-              <tr><td>Dibayar</td><td style="text-align:right;">Rp ${(receipt.cashGiven || 0).toLocaleString('id-ID')}</td></tr>
-              <tr><td>Kembalian</td><td style="text-align:right;">Rp ${(receipt.change || 0).toLocaleString('id-ID')}</td></tr>
-            ` : ''}
-          </table>
-
-          <div class="footer">
-            Terima kasih telah berbelanja<br />
-            NEXPOS F&B
-          </div>
-        </div>
-
-        <script>
-          window.onload = function() {
-            window.focus();
-            window.print();
-            window.onafterprint = function() { window.close(); };
-          };
-        </script>
-      </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-  };
-
   const generateWhatsAppReport = () => {
     const targetDate = reportFilterType === 'daily' ? reportDate : getFormattedDate();
     const outletTx = transactions.filter(t => t.dateStr === targetDate && t.status === 'completed');
@@ -973,19 +869,64 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
     </div>
   );
 
+  // --- KONDISI JIKA BELUM LOGIN (HALAMAN LOGIN) ---
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans text-slate-800">
+        <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6">
+          <div className="text-center space-y-2">
+            <div className="bg-amber-500 w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-slate-900 shadow-lg">
+              <Coffee className="w-8 h-8" />
+            </div>
+            <h1 className="text-xl font-black tracking-wider text-slate-900">NEXPOS LOGIN</h1>
+            <p className="text-xs text-slate-500">Sistem Kasir & Manajemen F&B Terintegrasi</p>
+          </div>
+
+          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
+            <div>
+              <label className="block mb-1.5 font-bold text-slate-700">Pilih Peran (Role)</label>
+              <select name="loginRole" className="w-full p-3 border-2 rounded-xl font-bold bg-slate-50 focus:border-amber-500 outline-none">
+                <option value="cashier">Kasir (Staff Toko)</option>
+                <option value="owner">Owner / Administrator</option>
+              </select>
+            </div>
+
+            <div id="cashierField">
+              <label className="block mb-1.5 font-bold text-slate-700">Nama Kasir / Petugas</label>
+              <input name="cashierUser" placeholder="Masukkan nama Anda" className="w-full p-3 border-2 rounded-xl bg-slate-50 focus:border-amber-500 outline-none" />
+            </div>
+
+            <div>
+              <label className="block mb-1.5 font-bold text-slate-700">PIN / Password (Default Owner: 1234)</label>
+              <input type="password" name="loginPassword" placeholder="Masukkan PIN akses" className="w-full p-3 border-2 rounded-xl bg-slate-50 focus:border-amber-500 outline-none font-bold text-center tracking-widest text-base" />
+            </div>
+
+            <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3.5 rounded-xl text-sm transition shadow-lg active:scale-98">
+              MASUK KE SISTEM
+            </button>
+          </form>
+
+          <div className="text-center pt-2 border-t text-[10px] text-slate-400">
+            NEXPOS F&B Automation System v2.0
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- TAMPILAN UTAMA SETELAH LOGIN ---
   return (
-    
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-100 text-slate-800 flex flex-col font-sans pb-16 md:pb-0">
+    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans pb-16 md:pb-0">
       
       {/* NAVBAR TOP */}
-      <header className="bg-slate-900 text-white px-2.5 sm:px-4 py-2.5 shadow-md flex items-center justify-between sticky top-0 z-30 min-w-0">
+      <header className="bg-slate-900 text-white px-3 sm:px-4 py-2.5 shadow-md flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center space-x-2 sm:space-x-3">
           <div className="bg-amber-500 p-1.5 sm:p-2 rounded-lg text-slate-900 font-extrabold flex items-center text-xs sm:text-sm">
             <Coffee className="w-4 h-4 sm:w-5 sm:h-5 mr-1"/>
             <span>NEXPOS</span>
           </div>
 
-          <div className="relative flex items-center bg-slate-800 rounded-lg border border-slate-700 px-1.5 sm:px-2 py-1 min-w-0 max-w-[45vw] sm:max-w-none">
+          <div className="relative flex items-center bg-slate-800 rounded-lg border border-slate-700 px-2 py-1">
             <Store className="w-3.5 h-3.5 text-amber-400 mr-1"/>
             <select
               value={activeOutletId}
@@ -993,7 +934,7 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
                 setActiveOutletId(e.target.value);
                 setCart([]);
               }}
-              className="bg-transparent text-[10px] sm:text-xs font-bold text-slate-200 outline-none cursor-pointer pr-1 max-w-[30vw] sm:max-w-none"
+              className="bg-transparent text-[11px] sm:text-xs font-bold text-slate-200 outline-none cursor-pointer pr-1"
             >
               {outlets.map(o => (
                 <option key={o.id} value={o.id} className="bg-slate-900 text-white">
@@ -1037,34 +978,38 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           <button onClick={() => setCurrentTab('history')} className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center ${currentTab === 'history' ? 'bg-amber-500 text-slate-900 font-bold' : 'text-slate-300 hover:bg-slate-800'}`}><Receipt className="w-4 h-4 mr-1"/>Riwayat</button>
         </div>
 
-        <div>
-          {activeRole === 'cashier' ? (
+        <div className="flex items-center space-x-2">
+          {activeRole === 'owner' ? (
             <button
-              onClick={() => { setPinPurpose('switch_owner'); setIsPinModalOpen(true); }}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] sm:text-xs px-2.5 py-1 sm:py-1.5 rounded-lg border border-slate-700 flex items-center font-medium"
+              onClick={() => setIsChangePasswordModalOpen(true)}
+              className="bg-slate-800 hover:bg-slate-700 text-amber-400 text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 flex items-center font-bold"
+              title="Ganti Password / PIN Owner"
             >
-              <Lock className="w-3 h-3 mr-1 text-amber-400"/>
-              Mode Kasir
+              <Key className="w-3.5 h-3.5 mr-1"/> Ganti PIN
             </button>
           ) : (
-            <button
-              onClick={() => setActiveRole('cashier')}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] sm:text-xs px-2.5 py-1 sm:py-1.5 rounded-lg flex items-center font-bold"
-            >
-              <Unlock className="w-3 h-3 mr-1"/>
-              Owner
-            </button>
+            <span className="text-[11px] text-slate-300 font-semibold px-2 py-1 bg-slate-800 rounded-lg">
+              👤 {currentUser?.username}
+            </span>
           )}
+
+          <button
+            onClick={handleLogout}
+            className="bg-rose-600 hover:bg-rose-500 text-white text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg flex items-center font-bold"
+            title="Keluar / Logout"
+          >
+            <LogOut className="w-3 h-3 mr-1"/> Keluar
+          </button>
         </div>
       </header>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden">
 
         {/* TAB 1: KASIR / POS */}
         {currentTab === 'pos' && (
-          <div className="flex-1 min-h-0 min-w-0 flex flex-col md:flex-row overflow-hidden relative">
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 pb-20 md:pb-4">
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+            <div className="flex-1 flex flex-col overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 pb-20 md:pb-4">
               <div className="flex flex-col sm:flex-row justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 shadow-sm">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400"/>
@@ -1213,7 +1158,7 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
                 }} className="space-y-3">
                   <div>
                     <label className="block mb-1 font-semibold text-slate-700">Nama Kasir Bertugas</label>
-                    <input required name="cashierName" className="w-full p-2.5 border rounded-xl" placeholder="Nama Kasir" />
+                    <input required name="cashierName" defaultValue={currentUser?.username || ''} className="w-full p-2.5 border rounded-xl" placeholder="Nama Kasir" />
                   </div>
                   <div>
                     <label className="block mb-1 font-semibold text-slate-700">Modal Kas Awal (Rp)</label>
@@ -1517,7 +1462,7 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
                 <tbody className="divide-y">
                   {products.length === 0 ? (
                     <tr>
-                      <td colSpan={activeRole === 'owner' ? 9 : 8} className="p-8 text-center text-slate-400 italic">
+                      <td colSpan={8} className="p-8 text-center text-slate-400 italic">
                         Belum ada menu di outlet ini. Klik tombol "+ Tambah Menu".
                       </td>
                     </tr>
@@ -1682,7 +1627,6 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
                     <th className="p-3">HPP (Modal)</th>
                     <th className="p-3 text-right">Total Jual</th>
                     <th className="p-3">Status</th>
-                    <th className="p-3 text-center">Cetak</th>
                     {activeRole === 'owner' && <th className="p-3 text-center">Hapus</th>}
                   </tr>
                 </thead>
@@ -1710,16 +1654,6 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
                             {t.status}
                           </span>
                         </td>
-                        <td className="p-3 text-center">
-                          <button
-                            onClick={() => handlePrintReceipt(t)}
-                            disabled={t.status !== 'completed'}
-                            className="p-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-40 disabled:cursor-not-allowed rounded"
-                            title="Cetak struk"
-                          >
-                            <Printer className="w-3.5 h-3.5"/>
-                          </button>
-                        </td>
                         {activeRole === 'owner' && (
                           <td className="p-3 text-center">
                             <button
@@ -1741,45 +1675,73 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
 
       </main>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR - MENU LENGKAP SEPERTI LAPTOP */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-slate-400 z-30">
-        <div className="flex items-center gap-1 overflow-x-auto px-1.5 py-1.5 scrollbar-none">
-        <button onClick={() => setCurrentTab('pos')} className={`flex-none min-w-[62px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'pos' ? 'text-amber-400 bg-slate-800' : ''}`}>
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-slate-400 flex justify-around items-center py-2 z-30 px-1">
+        <button onClick={() => setCurrentTab('pos')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'pos' ? 'text-amber-400' : ''}`}>
           <ShoppingBag className="w-5 h-5"/>
           <span>Kasir</span>
         </button>
-        <button onClick={() => setCurrentTab('shift')} className={`flex-none min-w-[62px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'shift' ? 'text-amber-400 bg-slate-800' : ''}`}>
+        <button onClick={() => setCurrentTab('shift')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'shift' ? 'text-amber-400' : ''}`}>
           <Clock className="w-5 h-5"/>
           <span>Shift</span>
         </button>
-        <button onClick={() => setCurrentTab('stock')} className={`flex-none min-w-[62px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'stock' ? 'text-amber-400 bg-slate-800' : ''}`}>
+        <button onClick={() => setCurrentTab('stock')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'stock' ? 'text-amber-400' : ''}`}>
           <PackageCheck className="w-5 h-5"/>
           <span>Stok</span>
         </button>
-        <button onClick={() => setCurrentTab('expenses')} className={`flex-none min-w-[78px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'expenses' ? 'text-amber-400 bg-slate-800' : ''}`}>
+        <button onClick={() => setCurrentTab('expenses')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'expenses' ? 'text-amber-400' : ''}`}>
           <Receipt className="w-5 h-5"/>
           <span>Pengeluaran</span>
         </button>
         {activeRole === 'owner' && (
           <>
-            <button onClick={() => setCurrentTab('products')} className={`flex-none min-w-[78px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'products' ? 'text-amber-400 bg-slate-800' : ''}`}>
+            <button onClick={() => setCurrentTab('products')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'products' ? 'text-amber-400' : ''}`}>
               <Layers className="w-5 h-5"/>
               <span>Menu</span>
             </button>
-            <button onClick={() => setCurrentTab('reports')} className={`flex-none min-w-[70px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'reports' ? 'text-amber-400 bg-slate-800' : ''}`}>
+            <button onClick={() => setCurrentTab('reports')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'reports' ? 'text-amber-400' : ''}`}>
               <TrendingUp className="w-5 h-5"/>
               <span>Laporan</span>
             </button>
           </>
         )}
-        <button onClick={() => setCurrentTab('history')} className={`flex-none min-w-[70px] px-2 py-1 flex flex-col items-center text-[10px] font-semibold whitespace-nowrap rounded-lg ${currentTab === 'history' ? 'text-amber-400 bg-slate-800' : ''}`}>
+        <button onClick={() => setCurrentTab('history')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'history' ? 'text-amber-400' : ''}`}>
           <Receipt className="w-5 h-5"/>
           <span>Riwayat</span>
         </button>
-        </div>
       </div>
 
-      {/* --- MODAL BUAT OUTLET BARU ---}
+      {/* --- MODAL GANTI PASSWORD / PIN OWNER --- */}
+      {isChangePasswordModalOpen && activeRole === 'owner' && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 text-xs">
+            <div className="flex justify-between items-center font-bold text-sm border-b pb-2">
+              <span className="flex items-center"><Key className="w-4 h-4 mr-1 text-amber-500"/> Ganti PIN / Password Owner</span>
+              <button onClick={() => setIsChangePasswordModalOpen(false)}><X className="w-5 h-5 text-slate-400"/></button>
+            </div>
+            <form onSubmit={handleChangePasswordSubmit} className="space-y-3">
+              <div>
+                <label className="block mb-1 font-bold text-slate-700">PIN Lama</label>
+                <input required type="password" name="oldPin" className="w-full p-2.5 border rounded-xl font-bold tracking-widest text-center" placeholder="****" />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-slate-700">PIN Baru</label>
+                <input required type="password" name="newPin" className="w-full p-2.5 border rounded-xl font-bold tracking-widest text-center" placeholder="****" />
+              </div>
+              <div>
+                <label className="block mb-1 font-bold text-slate-700">Konfirmasi PIN Baru</label>
+                <input required type="password" name="confirmPin" className="w-full p-2.5 border rounded-xl font-bold tracking-widest text-center" placeholder="****" />
+              </div>
+              <div className="flex space-x-2 pt-2">
+                <button type="button" onClick={() => setIsChangePasswordModalOpen(false)} className="flex-1 py-2.5 border rounded-xl">Batal</button>
+                <button type="submit" className="flex-1 py-2.5 bg-amber-500 text-slate-950 font-black rounded-xl">Simpan PIN Baru</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL BUAT OUTLET BARU --- */}
       {isOutletModalOpen && activeRole === 'owner' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 text-xs">
@@ -1982,21 +1944,9 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
               <span>TOTAL</span>
               <span>Rp {lastReceipt.grandTotal.toLocaleString('id-ID')}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <button
-                onClick={() => handlePrintReceipt(lastReceipt)}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-sans font-bold py-2.5 rounded-xl flex items-center justify-center"
-              >
-                <Printer className="w-4 h-4 mr-1.5"/>
-                Cetak / Print
-              </button>
-              <button
-                onClick={() => setIsReceiptModalOpen(false)}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-sans font-bold py-2.5 rounded-xl"
-              >
-                Selesai
-              </button>
-            </div>
+            <button onClick={() => setIsReceiptModalOpen(false)} className="w-full bg-slate-900 text-white font-sans font-bold py-2.5 rounded-xl mt-2">
+              Selesai
+            </button>
           </div>
         </div>
       )}
@@ -2085,70 +2035,35 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-1.5 items-center bg-slate-50 p-2 rounded-lg">
+                    <div className="flex gap-1.5 items-center bg-slate-50 p-2 rounded-lg">
                       <input
                         type="text"
                         id={`opt_name_${group.id}`}
                         placeholder="Nama Opsi (Misal: Extra Boba)"
-                        className="sm:col-span-2 flex-1 p-1 border rounded text-xs bg-white"
+                        className="flex-1 p-1 border rounded text-xs bg-white"
                       />
                       <input
                         type="number"
                         id={`opt_price_${group.id}`}
                         placeholder="+Biaya (Rp)"
-                        className="w-full p-1 border rounded text-xs bg-white"
+                        className="w-24 p-1 border rounded text-xs bg-white"
                       />
-                      <input
-                        type="number"
-                        id={`opt_stock_qty_${group.id}`}
-                        placeholder="Pakai stok"
-                        min="0"
-                        step="any"
-                        className="w-full p-1 border rounded text-xs bg-white"
-                      />
-                      <select
-                        id={`opt_ingredient_${group.id}`}
-                        defaultValue=""
-                        className="sm:col-span-3 p-1 border rounded text-xs bg-white"
-                      >
-                        <option value="">Tanpa potong stok (opsional)</option>
-                        {ingredients.map(ing => (
-                          <option key={ing.id} value={ing.id}>
-                            Stok: {ing.name} ({ing.unit})
-                          </option>
-                        ))}
-                      </select>
                       <button
                         type="button"
                         onClick={() => {
                           const nameInput = document.getElementById(`opt_name_${group.id}`);
                           const priceInput = document.getElementById(`opt_price_${group.id}`);
-                          const stockQtyInput = document.getElementById(`opt_stock_qty_${group.id}`);
-                          const ingredientInput = document.getElementById(`opt_ingredient_${group.id}`);
                           if (!nameInput.value.trim()) {
                             alert('Masukkan nama opsi varian!');
                             return;
                           }
-                          const stockQty = Number(stockQtyInput.value) || 0;
-                          if (stockQty > 0 && !ingredientInput.value) {
-                            alert('Pilih bahan stok yang akan dipotong untuk topping ini.');
-                            return;
-                          }
-                          if (ingredientInput.value && stockQty <= 0) {
-                            alert('Isi jumlah pemakaian stok topping lebih dari 0.');
-                            return;
-                          }
                           const newOpt = {
                             name: nameInput.value.trim(),
-                            extraPrice: Number(priceInput.value) || 0,
-                            ingredientId: ingredientInput.value || null,
-                            stockQty
+                            extraPrice: Number(priceInput.value) || 0
                           };
                           setFormCustomGroups(formCustomGroups.map(g => g.id === group.id ? { ...g, options: [...g.options, newOpt] } : g));
                           nameInput.value = '';
                           priceInput.value = '';
-                          stockQtyInput.value = '';
-                          ingredientInput.value = '';
                         }}
                         className="bg-slate-900 text-white font-bold px-2.5 py-1 rounded text-xs"
                       >
@@ -2158,55 +2073,17 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
 
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {group.options.map((opt, optIdx) => (
-                        <div key={optIdx} className="w-full bg-amber-50 border border-amber-200 p-2 rounded-lg text-[11px]">
-                          <div className="flex items-center justify-between gap-2">
-                            <div>
-                              <span className="font-medium text-slate-800">{opt.name}</span>
-                              {opt.extraPrice > 0 && <span className="text-amber-700 font-bold ml-1">(+Rp{opt.extraPrice.toLocaleString('id-ID')})</span>}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveOptionFromGroup(group.id, optIdx)}
-                              className="text-rose-500 font-bold hover:text-rose-700 px-1"
-                            >
-                              ×
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 mt-1.5">
-                            <select
-                              value={opt.ingredientId || ''}
-                              onChange={(e) => {
-                                const updated = [...formCustomGroups];
-                                const target = updated.find(g => g.id === group.id);
-                                if (target) target.options[optIdx] = { ...target.options[optIdx], ingredientId: e.target.value || null };
-                                setFormCustomGroups(updated);
-                              }}
-                              className="sm:col-span-2 p-1 border rounded bg-white text-[10px]"
-                            >
-                              <option value="">Tidak terhubung ke stok</option>
-                              {ingredients.map(ing => (
-                                <option key={ing.id} value={ing.id}>
-                                  Stok: {ing.name} ({ing.unit})
-                                </option>
-                              ))}
-                            </select>
-                            <input
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={opt.stockQty || ''}
-                              onChange={(e) => {
-                                const updated = [...formCustomGroups];
-                                const target = updated.find(g => g.id === group.id);
-                                if (target) target.options[optIdx] = { ...target.options[optIdx], stockQty: Number(e.target.value) || 0 };
-                                setFormCustomGroups(updated);
-                              }}
-                              placeholder="Qty stok"
-                              className="p-1 border rounded bg-white text-[10px]"
-                            />
-                          </div>
-                          <p className="text-[9px] text-slate-500 mt-1">{opt.ingredientId && opt.stockQty ? 'Stok akan berkurang saat topping dipilih dan transaksi dibayar.' : 'Belum terhubung ke stok.'}</p>
-                        </div>
+                        <span key={optIdx} className="bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-[11px] flex items-center">
+                          <span className="font-medium text-slate-800">{opt.name}</span>
+                          {opt.extraPrice > 0 && <span className="text-amber-700 font-bold ml-1">(+Rp{opt.extraPrice.toLocaleString('id-ID')})</span>}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveOptionFromGroup(group.id, optIdx)}
+                            className="text-rose-500 font-bold ml-2 hover:text-rose-700"
+                          >
+                            ×
+                          </button>
+                        </span>
                       ))}
                     </div>
                   </div>
@@ -2353,27 +2230,6 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
             >
               Buka Aplikasi Email
             </a>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODAL PIN OWNER --- */}
-      {isPinModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-xs rounded-2xl p-6 text-center space-y-3">
-            <h4 className="font-bold text-sm">Masukkan PIN Owner</h4>
-            <p className="text-[11px] text-slate-400">PIN Default: 1234</p>
-            <input
-              type="password"
-              value={pinInput}
-              onChange={(e) => setPinInput(e.target.value)}
-              className="w-full text-center border p-2 rounded-xl text-lg font-bold"
-              placeholder="****"
-            />
-            <div className="flex space-x-2">
-              <button onClick={() => setIsPinModalOpen(false)} className="flex-1 py-2 border rounded-xl text-xs">Batal</button>
-              <button onClick={handlePinSubmit} className="flex-1 py-2 bg-slate-900 text-white font-bold rounded-xl text-xs">Masuk</button>
-            </div>
           </div>
         </div>
       )}
