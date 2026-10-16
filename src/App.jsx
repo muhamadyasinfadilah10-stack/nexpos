@@ -29,6 +29,10 @@ import {
   Key
 } from 'lucide-react';
 
+<<<<<<< HEAD
+=======
+// --- HELPER FORMAT TANGGAL & WAKTU ---
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
 const getFormattedDate = (d = new Date()) => {
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -100,11 +104,16 @@ const INITIAL_PRODUCTS = [
 ];
 
 export default function App() {
+<<<<<<< HEAD
+=======
+  // --- STATE LOGIN & AUTH ---
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return localStorage.getItem('nexpos_is_logged_in') === 'true';
   });
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('nexpos_current_user');
+<<<<<<< HEAD
     return saved ? JSON.parse(saved) : null;
   });
 
@@ -117,6 +126,18 @@ export default function App() {
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [isChangeCashierPinModalOpen, setIsChangeCashierPinModalOpen] = useState(false);
 
+=======
+    return saved ? JSON.parse(saved) : null; // { username, role }
+  });
+
+  // Password / PIN Owner Storage
+  const [ownerPin, setOwnerPin] = useState(() => {
+    return localStorage.getItem('nexpos_owner_pin') || '1234';
+  });
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+
+  // --- STATE UTAMA APLIKASI ---
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
   const [outlets, setOutlets] = useState(() => {
     const saved = localStorage.getItem('nexpos_outlets');
     return saved ? JSON.parse(saved) : INITIAL_OUTLETS;
@@ -173,6 +194,10 @@ export default function App() {
     return saved ? JSON.parse(saved) : { out_1: [] };
   });
 
+<<<<<<< HEAD
+=======
+  // --- EFFECT LOCALSTORAGE ---
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
   useEffect(() => { localStorage.setItem('nexpos_outlets', JSON.stringify(outlets)); }, [outlets]);
   useEffect(() => { localStorage.setItem('nexpos_active_outlet_id', JSON.stringify(activeOutletId)); }, [activeOutletId]);
   useEffect(() => { localStorage.setItem('nexpos_categories_map', JSON.stringify(categoriesMap)); }, [categoriesMap]);
@@ -184,7 +209,10 @@ export default function App() {
   useEffect(() => { localStorage.setItem('nexpos_transactions_map', JSON.stringify(transactionsMap)); }, [transactionsMap]);
   useEffect(() => { localStorage.setItem('nexpos_expenses_map', JSON.stringify(expensesMap)); }, [expensesMap]);
   useEffect(() => { localStorage.setItem('nexpos_owner_pin', ownerPin); }, [ownerPin]);
+<<<<<<< HEAD
   useEffect(() => { localStorage.setItem('nexpos_cashier_pin', cashierPin); }, [cashierPin]);
+=======
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
   useEffect(() => { 
     localStorage.setItem('nexpos_is_logged_in', isLoggedIn); 
     localStorage.setItem('nexpos_current_user', JSON.stringify(currentUser));
@@ -258,22 +286,30 @@ export default function App() {
   const [reportDate, setReportDate] = useState(getFormattedDate());
   const [reportMonth, setReportMonth] = useState(getFormattedMonth());
 
+<<<<<<< HEAD
+=======
+  // --- HANDLER LOGIN & LOGOUT ---
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     const role = e.target.loginRole.value;
     const inputPass = e.target.loginPassword.value;
+<<<<<<< HEAD
     const cashierNameInput = e.target.cashierUser.value.trim();
 
     if (!inputPass) {
       alert('Password / PIN tidak boleh kosong!');
       return;
     }
+=======
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
 
     if (role === 'owner') {
       if (inputPass === ownerPin) {
         setIsLoggedIn(true);
         setCurrentUser({ username: 'Owner Utama', role: 'owner' });
       } else {
+<<<<<<< HEAD
         alert('PIN Owner Salah! Akses ditolak.');
         return;
       }
@@ -289,6 +325,14 @@ export default function App() {
         alert('PIN Kasir Salah! Akses ditolak.');
         return;
       }
+=======
+        alert('PIN / Password Owner Salah! (Default: 1234)');
+      }
+    } else {
+      // Kasir tidak wajib password rumit atau bebas masuk
+      setIsLoggedIn(true);
+      setCurrentUser({ username: e.target.cashierUser.value || 'Kasir Toko', role: 'cashier' });
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
     }
   };
 
@@ -307,7 +351,11 @@ export default function App() {
     const confirmPin = e.target.confirmPin.value;
 
     if (oldPin !== ownerPin) {
+<<<<<<< HEAD
       alert('PIN Lama Owner salah!');
+=======
+      alert('PIN Lama salah!');
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       return;
     }
     if (newPin !== confirmPin) {
@@ -325,6 +373,7 @@ export default function App() {
     e.target.reset();
   };
 
+<<<<<<< HEAD
   const handleChangeCashierPinSubmit = (e) => {
     e.preventDefault();
     const newPin = e.target.newCashierPin.value;
@@ -345,6 +394,8 @@ export default function App() {
     e.target.reset();
   };
 
+=======
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
   const calculateProductHPP = (recipeList) => {
     if (!recipeList || recipeList.length === 0) return 0;
     let totalHpp = 0;
@@ -903,6 +954,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
     </div>
   );
 
+<<<<<<< HEAD
+=======
+  // --- KONDISI JIKA BELUM LOGIN (HALAMAN LOGIN) ---
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans text-slate-800">
@@ -924,6 +979,7 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
               </select>
             </div>
 
+<<<<<<< HEAD
             <div>
               <label className="block mb-1.5 font-bold text-slate-700">Nama Kasir / Petugas</label>
               <input name="cashierUser" placeholder="Masukkan nama Anda (wajib untuk kasir)" className="w-full p-3 border-2 rounded-xl bg-slate-50 focus:border-amber-500 outline-none" />
@@ -931,6 +987,15 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
 
             <div>
               <label className="block mb-1.5 font-bold text-slate-700">PIN / Password (Owner: 1234 | Kasir: 5678)</label>
+=======
+            <div id="cashierField">
+              <label className="block mb-1.5 font-bold text-slate-700">Nama Kasir / Petugas</label>
+              <input name="cashierUser" placeholder="Masukkan nama Anda" className="w-full p-3 border-2 rounded-xl bg-slate-50 focus:border-amber-500 outline-none" />
+            </div>
+
+            <div>
+              <label className="block mb-1.5 font-bold text-slate-700">PIN / Password (Default Owner: 1234)</label>
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
               <input type="password" name="loginPassword" placeholder="Masukkan PIN akses" className="w-full p-3 border-2 rounded-xl bg-slate-50 focus:border-amber-500 outline-none font-bold text-center tracking-widest text-base" />
             </div>
 
@@ -947,9 +1012,17 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
     );
   }
 
+<<<<<<< HEAD
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans pb-16 md:pb-0">
       
+=======
+  // --- TAMPILAN UTAMA SETELAH LOGIN ---
+  return (
+    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans pb-16 md:pb-0">
+      
+      {/* NAVBAR TOP */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       <header className="bg-slate-900 text-white px-3 sm:px-4 py-2.5 shadow-md flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center space-x-2 sm:space-x-3">
           <div className="bg-amber-500 p-1.5 sm:p-2 rounded-lg text-slate-900 font-extrabold flex items-center text-xs sm:text-sm">
@@ -1009,6 +1082,7 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           <button onClick={() => setCurrentTab('history')} className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center ${currentTab === 'history' ? 'bg-amber-500 text-slate-900 font-bold' : 'text-slate-300 hover:bg-slate-800'}`}><Receipt className="w-4 h-4 mr-1"/>Riwayat</button>
         </div>
 
+<<<<<<< HEAD
         <div className="flex items-center space-x-1.5 sm:space-x-2">
           {activeRole === 'owner' ? (
             <div className="flex items-center space-x-1.5">
@@ -1028,6 +1102,20 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           ) : (
             <span className="text-[11px] text-slate-300 font-semibold px-2.5 py-1 bg-slate-800 rounded-lg">
               👤 {currentUser?.username} (Kasir)
+=======
+        <div className="flex items-center space-x-2">
+          {activeRole === 'owner' ? (
+            <button
+              onClick={() => setIsChangePasswordModalOpen(true)}
+              className="bg-slate-800 hover:bg-slate-700 text-amber-400 text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 flex items-center font-bold"
+              title="Ganti Password / PIN Owner"
+            >
+              <Key className="w-3.5 h-3.5 mr-1"/> Ganti PIN
+            </button>
+          ) : (
+            <span className="text-[11px] text-slate-300 font-semibold px-2 py-1 bg-slate-800 rounded-lg">
+              👤 {currentUser?.username}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
             </span>
           )}
 
@@ -1041,8 +1129,15 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       </header>
 
+<<<<<<< HEAD
       <main className="flex-1 flex flex-col overflow-hidden">
 
+=======
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+
+        {/* TAB 1: KASIR / POS */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
         {currentTab === 'pos' && (
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
             <div className="flex-1 flex flex-col overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 pb-20 md:pb-4">
@@ -1155,6 +1250,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           </div>
         )}
 
+<<<<<<< HEAD
+=======
+        {/* TAB 2: SHIFT KASIR */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
         {currentTab === 'shift' && (
           <div className="p-4 sm:p-6 max-w-md mx-auto w-full overflow-y-auto">
             <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border space-y-4 text-xs">
@@ -1289,6 +1388,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           </div>
         )}
 
+<<<<<<< HEAD
+=======
+        {/* TAB 3: STOK GUDANG & HPP BAHAN */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
         {currentTab === 'stock' && (
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4 overflow-y-auto">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
@@ -1400,6 +1503,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           </div>
         )}
 
+<<<<<<< HEAD
+=======
+        {/* TAB 4: PENGELUARAN */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
         {currentTab === 'expenses' && (
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4 overflow-y-auto">
             <div className="grid md:grid-cols-3 gap-4">
@@ -1465,6 +1572,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           </div>
         )}
 
+<<<<<<< HEAD
+=======
+        {/* TAB 5: KELOLA MENU & RESEP HPP (OWNER ONLY) */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
         {currentTab === 'products' && activeRole === 'owner' && (
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4 overflow-y-auto">
             <div className="flex justify-between items-center">
@@ -1558,6 +1669,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           </div>
         )}
 
+<<<<<<< HEAD
+=======
+        {/* TAB 6: LAPORAN KEUANGAN & HPP (OWNER ONLY) */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
         {currentTab === 'reports' && activeRole === 'owner' && (
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4 sm:space-y-6 text-xs overflow-y-auto">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -1643,6 +1758,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
           </div>
         )}
 
+<<<<<<< HEAD
+=======
+        {/* TAB 7: RIWAYAT TRANSAKSI */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
         {currentTab === 'history' && (
           <div className="p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4 overflow-y-auto">
             <h3 className="font-bold text-sm sm:text-base">Riwayat Transaksi Pelanggan ({currentOutletObj.name})</h3>
@@ -1705,6 +1824,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
 
       </main>
 
+<<<<<<< HEAD
+=======
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 text-slate-400 flex justify-around items-center py-2 z-30 px-1">
         <button onClick={() => setCurrentTab('pos')} className={`flex flex-col items-center text-[10px] font-semibold ${currentTab === 'pos' ? 'text-amber-400' : ''}`}>
           <ShoppingBag className="w-5 h-5"/>
@@ -1740,16 +1863,28 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </button>
       </div>
 
+<<<<<<< HEAD
+=======
+      {/* --- MODAL GANTI PASSWORD / PIN OWNER --- */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       {isChangePasswordModalOpen && activeRole === 'owner' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 text-xs">
             <div className="flex justify-between items-center font-bold text-sm border-b pb-2">
+<<<<<<< HEAD
               <span className="flex items-center"><Key className="w-4 h-4 mr-1 text-amber-500"/> Ganti PIN Owner</span>
+=======
+              <span className="flex items-center"><Key className="w-4 h-4 mr-1 text-amber-500"/> Ganti PIN / Password Owner</span>
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
               <button onClick={() => setIsChangePasswordModalOpen(false)}><X className="w-5 h-5 text-slate-400"/></button>
             </div>
             <form onSubmit={handleChangePasswordSubmit} className="space-y-3">
               <div>
+<<<<<<< HEAD
                 <label className="block mb-1 font-bold text-slate-700">PIN Lama Owner</label>
+=======
+                <label className="block mb-1 font-bold text-slate-700">PIN Lama</label>
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
                 <input required type="password" name="oldPin" className="w-full p-2.5 border rounded-xl font-bold tracking-widest text-center" placeholder="****" />
               </div>
               <div>
@@ -1769,6 +1904,7 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       )}
 
+<<<<<<< HEAD
       {isChangeCashierPinModalOpen && activeRole === 'owner' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 text-xs">
@@ -1794,6 +1930,9 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       )}
 
+=======
+      {/* --- MODAL BUAT OUTLET BARU --- */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       {isOutletModalOpen && activeRole === 'owner' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-4 text-xs">
@@ -1815,6 +1954,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       )}
 
+<<<<<<< HEAD
+=======
+      {/* --- MODAL KELOLA OUTLET --- */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       {isManageOutletsModalOpen && activeRole === 'owner' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-md rounded-2xl p-5 space-y-4 text-xs">
@@ -1848,6 +1991,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       )}
 
+<<<<<<< HEAD
+=======
+      {/* --- MODAL CUSTOMIZING PRODUCT (VARIAN) --- */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       {customizingProduct && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]">
@@ -1905,6 +2052,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       )}
 
+<<<<<<< HEAD
+=======
+      {/* --- MODAL CHECKOUT PEMBAYARAN --- */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       {isCheckoutModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl p-5 space-y-4 text-xs max-h-[90vh] overflow-y-auto">
@@ -1968,6 +2119,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       )}
 
+<<<<<<< HEAD
+=======
+      {/* --- MODAL STRUK --- */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       {isReceiptModalOpen && lastReceipt && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden p-4 space-y-3 text-xs font-mono">
@@ -1999,6 +2154,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       )}
 
+<<<<<<< HEAD
+=======
+      {/* --- MODAL TAMBAH/EDIT PRODUK & KUSTOM VARIAN & RESEP HPP --- */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       {isProductModalOpen && activeRole === 'owner' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-lg rounded-2xl p-5 space-y-4 text-xs max-h-[90vh] overflow-y-auto">
@@ -2037,6 +2196,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
                 <input name="imageUrl" defaultValue={editingProduct ? editingProduct.image : ''} className="w-full p-2 border rounded-xl" placeholder="https://..." />
               </div>
 
+<<<<<<< HEAD
+=======
+              {/* PENGATURAN VARIAN & TOPPING MENU */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
               <div className="pt-3 border-t space-y-3">
                 <h4 className="font-bold text-slate-800">Kelola Varian & Topping Menu</h4>
                 
@@ -2136,6 +2299,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
                 ))}
               </div>
 
+<<<<<<< HEAD
+=======
+              {/* PENGATURAN RESEP BAHAN BAKU & HPP OTOMATIS */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
               <div className="pt-3 border-t space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-slate-800">Kustomisasi Resep HPP (Bahan yang Dipotong)</span>
@@ -2202,6 +2369,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       )}
 
+<<<<<<< HEAD
+=======
+      {/* --- MODAL TAMBAH BAHAN BAKU & COST --- */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       {isIngredientModalOpen && activeRole === 'owner' && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-sm rounded-2xl p-5 space-y-3 text-xs">
@@ -2240,6 +2411,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       )}
 
+<<<<<<< HEAD
+=======
+      {/* --- MODAL RESTOK --- */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       {isRestockModalOpen && selectedIngredientForRestock && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white w-full max-w-xs rounded-2xl p-5 space-y-3 text-xs">
@@ -2259,6 +2434,10 @@ _Laporan Otomatis Real-time NEXPOS F&B_`;
         </div>
       )}
 
+<<<<<<< HEAD
+=======
+      {/* --- MODAL EMAIL LAPORAN --- */}
+>>>>>>> da528e661a94ae5446b1409f625b7ae10d344be4
       {isEmailModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white max-w-lg w-full rounded-2xl p-5 space-y-4 text-xs">
